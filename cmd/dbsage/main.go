@@ -7,6 +7,7 @@ import (
 	"dbsage/internal/ai"
 	"dbsage/internal/ui"
 	"dbsage/pkg/database"
+	"dbsage/pkg/dbinterfaces"
 )
 
 func main() {
@@ -22,7 +23,7 @@ func main() {
 	}
 
 	// Initialize connection service (will automatically load connections from config file)
-	connService := database.NewConnectionService()
+	connService := database.NewDefaultConnectionService()
 	defer connService.Close()
 
 	// Get current database tools
@@ -34,7 +35,7 @@ func main() {
 	}
 
 	// Initialize OpenAI client with dynamic database tools
-	openaiClient := ai.NewClientWithDynamicTools(apiKey, baseURL, func() *database.DatabaseTools {
+	openaiClient := ai.NewClientWithDynamicTools(apiKey, baseURL, func() dbinterfaces.DatabaseInterface {
 		return connService.GetCurrentTools()
 	})
 

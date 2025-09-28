@@ -7,7 +7,7 @@ import (
 	"dbsage/internal/ui/handlers"
 	"dbsage/internal/ui/renderers"
 	"dbsage/internal/ui/state"
-	"dbsage/pkg/database"
+	"dbsage/pkg/dbinterfaces"
 
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -31,7 +31,7 @@ type Model struct {
 }
 
 // NewModel creates a new Bubble Tea model
-func NewModel(client *ai.Client, dbTools *database.DatabaseTools, connService *database.ConnectionService) *Model {
+func NewModel(client *ai.Client, dbTools dbinterfaces.DatabaseInterface, connService dbinterfaces.ConnectionServiceInterface) *Model {
 	// Initialize components
 	stateManager := state.NewStateManager(client, dbTools, connService)
 	contentRenderer := renderers.NewContentRenderer()
@@ -225,7 +225,7 @@ func (m *Model) renderInputBoxWithConnection() string {
 }
 
 // Run runs the Bubble Tea program
-func Run(aiClient *ai.Client, dbTools *database.DatabaseTools, connService *database.ConnectionService) error {
+func Run(aiClient *ai.Client, dbTools dbinterfaces.DatabaseInterface, connService dbinterfaces.ConnectionServiceInterface) error {
 	model := NewModel(aiClient, dbTools, connService)
 
 	p := tea.NewProgram(

@@ -3,16 +3,21 @@ package database
 import (
 	"fmt"
 	"log"
+
+	"dbsage/pkg/dbinterfaces"
 )
 
 // ConnectionService provides a high-level interface for database connection management
 type ConnectionService struct {
-	manager *ConnectionManager
-	current *DatabaseTools
+	manager dbinterfaces.ConnectionManagerInterface
+	current dbinterfaces.DatabaseInterface
 }
 
+// Ensure ConnectionService implements ConnectionServiceInterface
+var _ dbinterfaces.ConnectionServiceInterface = (*ConnectionService)(nil)
+
 // NewConnectionService creates a new connection service
-func NewConnectionService() *ConnectionService {
+func NewConnectionService() dbinterfaces.ConnectionServiceInterface {
 	manager := NewConnectionManager()
 	service := &ConnectionService{
 		manager: manager,
@@ -50,12 +55,12 @@ func (cs *ConnectionService) initializeConnection() {
 }
 
 // GetCurrentTools returns the current database tools
-func (cs *ConnectionService) GetCurrentTools() *DatabaseTools {
+func (cs *ConnectionService) GetCurrentTools() dbinterfaces.DatabaseInterface {
 	// Check if current connection is healthy
 	if cs.current != nil && !cs.current.IsConnectionHealthy() {
 		// Try to refresh the current connection
-		if dbTools, _, err := cs.manager.GetCurrentConnection(); err == nil {
-			cs.current = dbTools
+		if dbInterface, _, err := cs.manager.GetCurrentConnection(); err == nil {
+			cs.current = dbInterface
 		} else {
 			cs.current = nil
 		}
@@ -64,12 +69,12 @@ func (cs *ConnectionService) GetCurrentTools() *DatabaseTools {
 }
 
 // GetConnectionManager returns the connection manager
-func (cs *ConnectionService) GetConnectionManager() *ConnectionManager {
+func (cs *ConnectionService) GetConnectionManager() dbinterfaces.ConnectionManagerInterface {
 	return cs.manager
 }
 
 // AddConnection adds a new database connection
-func (cs *ConnectionService) AddConnection(config *ConnectionConfig) error {
+func (cs *ConnectionService) AddConnection(config *dbinterfaces.ConnectionConfig) error {
 	err := cs.manager.AddConnection(config)
 	if err != nil {
 		return err
@@ -77,8 +82,8 @@ func (cs *ConnectionService) AddConnection(config *ConnectionConfig) error {
 
 	// Update current connection if this is the first one or if requested
 	if cs.current == nil {
-		if dbTools, _, err := cs.manager.GetCurrentConnection(); err == nil {
-			cs.current = dbTools
+		if dbInterface, _, err := cs.manager.GetCurrentConnection(); err == nil {
+			cs.current = dbInterface
 		}
 	}
 
@@ -93,8 +98,8 @@ func (cs *ConnectionService) SwitchConnection(name string) error {
 	}
 
 	// Update current tools
-	if dbTools, _, err := cs.manager.GetCurrentConnection(); err == nil {
-		cs.current = dbTools
+	if dbInterface, _, err := cs.manager.GetCurrentConnection(); err == nil {
+		cs.current = dbInterface
 		return nil
 	}
 
@@ -109,8 +114,8 @@ func (cs *ConnectionService) RemoveConnection(name string) error {
 	}
 
 	// Update current tools if the removed connection was current
-	if dbTools, _, err := cs.manager.GetCurrentConnection(); err == nil {
-		cs.current = dbTools
+	if dbInterface, _, err := cs.manager.GetCurrentConnection(); err == nil {
+		cs.current = dbInterface
 	} else {
 		cs.current = nil
 	}
@@ -119,7 +124,7 @@ func (cs *ConnectionService) RemoveConnection(name string) error {
 }
 
 // GetConnectionInfo returns information about all connections
-func (cs *ConnectionService) GetConnectionInfo() (map[string]*ConnectionConfig, map[string]string, string) {
+func (cs *ConnectionService) GetConnectionInfo() (map[string]*dbinterfaces.ConnectionConfig, map[string]string, string) {
 	connections := cs.manager.ListConnections()
 	status := cs.manager.GetConnectionStatus()
 
@@ -132,20 +137,18 @@ func (cs *ConnectionService) GetConnectionInfo() (map[string]*ConnectionConfig, 
 }
 
 // TestConnection tests a connection configuration without adding it
-func (cs *ConnectionService) TestConnection(config *ConnectionConfig) error {
-	// Build connection URL
-	connURL := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s",
-		config.Username, config.Password, config.Host, config.Port,
-		config.Database, config.SSLMode)
-
-	// Test connection
-	dbTools, err := NewDatabaseTools(connURL)
-	if err != nil {
-		return fmt.Errorf("connection test failed: %w", err)
+func (cs *ConnectionService) TestConnection(config *dbinterfaces.ConnectionConfig) error {
+	// Get the provider manager from the connection manager
+	if manager, ok := cs.manager.(*ConnectionManager); ok {
+		// Create a temporary connection to test
+		dbInterface, err := manager.providerManager.CreateConnection(config)
+		if err != nil {
+			return fmt.Errorf("connection test failed: %w", err)
+		}
+		defer dbInterface.Close()
+		return nil
 	}
-	defer dbTools.Close()
-
-	return nil
+	return fmt.Errorf("unable to access provider manager for connection testing")
 }
 
 // Close closes all connections
@@ -177,8 +180,8 @@ func (cs *ConnectionService) EnsureHealthyConnection() error {
 
 	if !cs.current.IsConnectionHealthy() {
 		// Try to get a healthy connection from the manager
-		if dbTools, name, err := cs.manager.GetCurrentConnection(); err == nil {
-			cs.current = dbTools
+		if dbInterface, name, err := cs.manager.GetCurrentConnection(); err == nil {
+			cs.current = dbInterface
 			log.Printf("Reconnected to database: %s", name)
 			return nil
 		} else {

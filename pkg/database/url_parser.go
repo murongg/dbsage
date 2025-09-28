@@ -5,13 +5,15 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+
+	"dbsage/pkg/dbinterfaces"
 )
 
 // ParseDatabaseURL parses a database URL and returns a ConnectionConfig
 // Supports formats like:
 // postgres://user:password@host:port/database?sslmode=disable
 // postgresql://user:password@host:port/database?sslmode=disable
-func ParseDatabaseURL(databaseURL string) (*ConnectionConfig, error) {
+func ParseDatabaseURL(databaseURL string) (*dbinterfaces.ConnectionConfig, error) {
 	// Parse the URL
 	u, err := url.Parse(databaseURL)
 	if err != nil {
@@ -58,7 +60,7 @@ func ParseDatabaseURL(databaseURL string) (*ConnectionConfig, error) {
 		sslMode = u.Query().Get("sslmode")
 	}
 
-	config := &ConnectionConfig{
+	config := &dbinterfaces.ConnectionConfig{
 		Host:     host,
 		Port:     port,
 		Database: database,
@@ -71,7 +73,7 @@ func ParseDatabaseURL(databaseURL string) (*ConnectionConfig, error) {
 }
 
 // BuildDatabaseURL builds a database URL from a ConnectionConfig
-func BuildDatabaseURL(config *ConnectionConfig) string {
+func BuildDatabaseURL(config *dbinterfaces.ConnectionConfig) string {
 	// Build user info
 	userInfo := config.Username
 	if config.Password != "" {

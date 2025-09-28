@@ -4,29 +4,29 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"dbsage/pkg/database"
+	"dbsage/pkg/dbinterfaces"
 
 	"github.com/sashabaranov/go-openai"
 )
 
 // Executor handles tool execution
 type Executor struct {
-	dbTools    *database.DatabaseTools
-	getDbTools func() *database.DatabaseTools
+	dbTools    dbinterfaces.DatabaseInterface
+	getDbTools func() dbinterfaces.DatabaseInterface
 }
 
-func NewExecutor(dbTools *database.DatabaseTools) *Executor {
+func NewExecutor(dbTools dbinterfaces.DatabaseInterface) *Executor {
 	return &Executor{dbTools: dbTools}
 }
 
-func NewExecutorWithDynamicTools(getDbTools func() *database.DatabaseTools) *Executor {
+func NewExecutorWithDynamicTools(getDbTools func() dbinterfaces.DatabaseInterface) *Executor {
 	return &Executor{getDbTools: getDbTools}
 }
 
 // Execute executes a tool call
 func (e *Executor) Execute(toolCall openai.ToolCall) (string, error) {
 	// Get current database tools (either static or dynamic)
-	var dbTools *database.DatabaseTools
+	var dbTools dbinterfaces.DatabaseInterface
 	if e.getDbTools != nil {
 		dbTools = e.getDbTools()
 	} else {
@@ -71,7 +71,7 @@ func (e *Executor) Execute(toolCall openai.ToolCall) (string, error) {
 	}
 }
 
-func (e *Executor) executeSQL(dbTools *database.DatabaseTools, args map[string]interface{}) (string, error) {
+func (e *Executor) executeSQL(dbTools dbinterfaces.DatabaseInterface, args map[string]interface{}) (string, error) {
 	sql, ok := args["sql"].(string)
 	if !ok {
 		return "", fmt.Errorf("sql argument is required and must be a string")
@@ -84,7 +84,7 @@ func (e *Executor) executeSQL(dbTools *database.DatabaseTools, args map[string]i
 	return string(resultJSON), nil
 }
 
-func (e *Executor) getAllTables(dbTools *database.DatabaseTools) (string, error) {
+func (e *Executor) getAllTables(dbTools dbinterfaces.DatabaseInterface) (string, error) {
 	tables, err := dbTools.GetAllTables()
 	if err != nil {
 		return "", err
@@ -93,7 +93,7 @@ func (e *Executor) getAllTables(dbTools *database.DatabaseTools) (string, error)
 	return string(resultJSON), nil
 }
 
-func (e *Executor) getTableSchema(dbTools *database.DatabaseTools, args map[string]interface{}) (string, error) {
+func (e *Executor) getTableSchema(dbTools dbinterfaces.DatabaseInterface, args map[string]interface{}) (string, error) {
 	tableName, ok := args["tableName"].(string)
 	if !ok {
 		return "", fmt.Errorf("tableName argument is required and must be a string")
@@ -106,7 +106,7 @@ func (e *Executor) getTableSchema(dbTools *database.DatabaseTools, args map[stri
 	return string(resultJSON), nil
 }
 
-func (e *Executor) explainQuery(dbTools *database.DatabaseTools, args map[string]interface{}) (string, error) {
+func (e *Executor) explainQuery(dbTools dbinterfaces.DatabaseInterface, args map[string]interface{}) (string, error) {
 	sql, ok := args["sql"].(string)
 	if !ok {
 		return "", fmt.Errorf("sql argument is required and must be a string")
@@ -119,7 +119,7 @@ func (e *Executor) explainQuery(dbTools *database.DatabaseTools, args map[string
 	return string(resultJSON), nil
 }
 
-func (e *Executor) getTableIndexes(dbTools *database.DatabaseTools, args map[string]interface{}) (string, error) {
+func (e *Executor) getTableIndexes(dbTools dbinterfaces.DatabaseInterface, args map[string]interface{}) (string, error) {
 	tableName, ok := args["tableName"].(string)
 	if !ok {
 		return "", fmt.Errorf("tableName argument is required and must be a string")
@@ -132,7 +132,7 @@ func (e *Executor) getTableIndexes(dbTools *database.DatabaseTools, args map[str
 	return string(resultJSON), nil
 }
 
-func (e *Executor) getTableStats(dbTools *database.DatabaseTools, args map[string]interface{}) (string, error) {
+func (e *Executor) getTableStats(dbTools dbinterfaces.DatabaseInterface, args map[string]interface{}) (string, error) {
 	tableName, ok := args["tableName"].(string)
 	if !ok {
 		return "", fmt.Errorf("tableName argument is required and must be a string")
@@ -145,7 +145,7 @@ func (e *Executor) getTableStats(dbTools *database.DatabaseTools, args map[strin
 	return string(resultJSON), nil
 }
 
-func (e *Executor) findDuplicateData(dbTools *database.DatabaseTools, args map[string]interface{}) (string, error) {
+func (e *Executor) findDuplicateData(dbTools dbinterfaces.DatabaseInterface, args map[string]interface{}) (string, error) {
 	tableName, ok := args["tableName"].(string)
 	if !ok {
 		return "", fmt.Errorf("tableName argument is required and must be a string")
@@ -168,7 +168,7 @@ func (e *Executor) findDuplicateData(dbTools *database.DatabaseTools, args map[s
 	return string(resultJSON), nil
 }
 
-func (e *Executor) getSlowQueries(dbTools *database.DatabaseTools) (string, error) {
+func (e *Executor) getSlowQueries(dbTools dbinterfaces.DatabaseInterface) (string, error) {
 	queries, err := dbTools.GetSlowQueries()
 	if err != nil {
 		return "", err
@@ -177,7 +177,7 @@ func (e *Executor) getSlowQueries(dbTools *database.DatabaseTools) (string, erro
 	return string(resultJSON), nil
 }
 
-func (e *Executor) getDatabaseSize(dbTools *database.DatabaseTools) (string, error) {
+func (e *Executor) getDatabaseSize(dbTools dbinterfaces.DatabaseInterface) (string, error) {
 	size, err := dbTools.GetDatabaseSize()
 	if err != nil {
 		return "", err
@@ -186,7 +186,7 @@ func (e *Executor) getDatabaseSize(dbTools *database.DatabaseTools) (string, err
 	return string(resultJSON), nil
 }
 
-func (e *Executor) getTableSizes(dbTools *database.DatabaseTools) (string, error) {
+func (e *Executor) getTableSizes(dbTools dbinterfaces.DatabaseInterface) (string, error) {
 	sizes, err := dbTools.GetTableSizes()
 	if err != nil {
 		return "", err
@@ -195,7 +195,7 @@ func (e *Executor) getTableSizes(dbTools *database.DatabaseTools) (string, error
 	return string(resultJSON), nil
 }
 
-func (e *Executor) getActiveConnections(dbTools *database.DatabaseTools) (string, error) {
+func (e *Executor) getActiveConnections(dbTools dbinterfaces.DatabaseInterface) (string, error) {
 	connections, err := dbTools.GetActiveConnections()
 	if err != nil {
 		return "", err

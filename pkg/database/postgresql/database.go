@@ -1,4 +1,4 @@
-package database
+package postgresql
 
 import (
 	"database/sql"
@@ -6,22 +6,26 @@ import (
 	"strings"
 
 	"dbsage/internal/models"
-	"dbsage/pkg/database/queries"
-	"dbsage/pkg/database/stats"
+	"dbsage/pkg/database/postgresql/queries"
+	"dbsage/pkg/database/postgresql/stats"
+	"dbsage/pkg/dbinterfaces"
 
 	_ "github.com/lib/pq"
 )
 
-// DatabaseTools provides high-level database operations
-type DatabaseTools struct {
+// PostgreSQLDatabase implements the DatabaseInterface for PostgreSQL
+type PostgreSQLDatabase struct {
 	db                     *sql.DB
-	queryExecutor          *queries.Executor
-	tableStatsCollector    *stats.TableStatsCollector
-	databaseStatsCollector *stats.DatabaseStatsCollector
+	queryExecutor          dbinterfaces.QueryExecutorInterface
+	tableStatsCollector    dbinterfaces.TableStatsCollectorInterface
+	databaseStatsCollector dbinterfaces.DatabaseStatsCollectorInterface
 }
 
-// NewDatabaseTools creates a new database tools instance
-func NewDatabaseTools(connectionURL string) (*DatabaseTools, error) {
+// Ensure PostgreSQLDatabase implements DatabaseInterface
+var _ dbinterfaces.DatabaseInterface = (*PostgreSQLDatabase)(nil)
+
+// NewPostgreSQLDatabase creates a new PostgreSQL database instance
+func NewPostgreSQLDatabase(connectionURL string) (*PostgreSQLDatabase, error) {
 	db, err := sql.Open("postgres", connectionURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
@@ -32,50 +36,50 @@ func NewDatabaseTools(connectionURL string) (*DatabaseTools, error) {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	return &DatabaseTools{
+	return &PostgreSQLDatabase{
 		db:                     db,
-		queryExecutor:          queries.NewExecutor(db),
-		tableStatsCollector:    stats.NewTableStatsCollector(db),
-		databaseStatsCollector: stats.NewDatabaseStatsCollector(db),
+		queryExecutor:          queries.NewPostgreSQLExecutor(db),
+		tableStatsCollector:    stats.NewPostgreSQLTableStatsCollector(db),
+		databaseStatsCollector: stats.NewPostgreSQLDatabaseStatsCollector(db),
 	}, nil
 }
 
 // Close closes the database connection
-func (dt *DatabaseTools) Close() error {
-	if dt.db != nil {
-		return dt.db.Close()
+func (pg *PostgreSQLDatabase) Close() error {
+	if pg.db != nil {
+		return pg.db.Close()
 	}
 	return nil
 }
 
 // IsConnectionHealthy checks if the database connection is healthy
-func (dt *DatabaseTools) IsConnectionHealthy() bool {
-	if dt.db == nil {
+func (pg *PostgreSQLDatabase) IsConnectionHealthy() bool {
+	if pg.db == nil {
 		return false
 	}
-	return dt.db.Ping() == nil
+	return pg.db.Ping() == nil
 }
 
 // CheckConnection checks if the database connection is working
-func (dt *DatabaseTools) CheckConnection() error {
-	if dt.db == nil {
+func (pg *PostgreSQLDatabase) CheckConnection() error {
+	if pg.db == nil {
 		return fmt.Errorf("database connection is nil")
 	}
-	return dt.db.Ping()
+	return pg.db.Ping()
 }
 
 // ExecuteSQL executes a SQL query
-func (dt *DatabaseTools) ExecuteSQL(query string) (*models.QueryResult, error) {
-	return dt.queryExecutor.ExecuteSQL(query)
+func (pg *PostgreSQLDatabase) ExecuteSQL(query string) (*models.QueryResult, error) {
+	return pg.queryExecutor.ExecuteSQL(query)
 }
 
 // ExplainQuery analyzes a query's execution plan
-func (dt *DatabaseTools) ExplainQuery(query string) (*models.QueryResult, error) {
-	return dt.queryExecutor.ExplainQuery(query)
+func (pg *PostgreSQLDatabase) ExplainQuery(query string) (*models.QueryResult, error) {
+	return pg.queryExecutor.ExplainQuery(query)
 }
 
 // GetAllTables returns a list of all tables
-func (dt *DatabaseTools) GetAllTables() ([]models.TableInfo, error) {
+func (pg *PostgreSQLDatabase) GetAllTables() ([]models.TableInfo, error) {
 	query := `
 		SELECT 
 			table_name,
@@ -88,7 +92,7 @@ func (dt *DatabaseTools) GetAllTables() ([]models.TableInfo, error) {
 		ORDER BY table_schema, table_name
 	`
 
-	rows, err := dt.db.Query(query)
+	rows, err := pg.db.Query(query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query tables: %w", err)
 	}
@@ -108,7 +112,7 @@ func (dt *DatabaseTools) GetAllTables() ([]models.TableInfo, error) {
 }
 
 // GetTableSchema returns detailed schema information for a table
-func (dt *DatabaseTools) GetTableSchema(tableName string) ([]models.ColumnInfo, error) {
+func (pg *PostgreSQLDatabase) GetTableSchema(tableName string) ([]models.ColumnInfo, error) {
 	query := `
 		SELECT 
 			column_name,
@@ -140,7 +144,7 @@ func (dt *DatabaseTools) GetTableSchema(tableName string) ([]models.ColumnInfo, 
 		ORDER BY isc.ordinal_position
 	`
 
-	rows, err := dt.db.Query(query, tableName)
+	rows, err := pg.db.Query(query, tableName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query table schema: %w", err)
 	}
@@ -171,7 +175,7 @@ func (dt *DatabaseTools) GetTableSchema(tableName string) ([]models.ColumnInfo, 
 }
 
 // GetTableIndexes returns index information for a table
-func (dt *DatabaseTools) GetTableIndexes(tableName string) ([]models.IndexInfo, error) {
+func (pg *PostgreSQLDatabase) GetTableIndexes(tableName string) ([]models.IndexInfo, error) {
 	query := `
 		SELECT 
 			i.relname as index_name,
@@ -192,7 +196,7 @@ func (dt *DatabaseTools) GetTableIndexes(tableName string) ([]models.IndexInfo, 
 		ORDER BY i.relname
 	`
 
-	rows, err := dt.db.Query(query, tableName)
+	rows, err := pg.db.Query(query, tableName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query table indexes: %w", err)
 	}
@@ -216,7 +220,6 @@ func (dt *DatabaseTools) GetTableIndexes(tableName string) ([]models.IndexInfo, 
 		}
 
 		// Parse the columns array (PostgreSQL array format)
-		// This is a simplified parser - you might want to use a proper array parser
 		columnsArray = strings.Trim(columnsArray, "{}")
 		if columnsArray != "" {
 			idx.Columns = strings.Split(columnsArray, ",")
@@ -228,33 +231,8 @@ func (dt *DatabaseTools) GetTableIndexes(tableName string) ([]models.IndexInfo, 
 	return indexes, nil
 }
 
-// GetTableStats returns statistics for a table
-func (dt *DatabaseTools) GetTableStats(tableName string) (*models.TableStats, error) {
-	return dt.tableStatsCollector.GetTableStats(tableName)
-}
-
-// GetTableSizes returns size information for all tables
-func (dt *DatabaseTools) GetTableSizes() ([]map[string]interface{}, error) {
-	return dt.tableStatsCollector.GetTableSizes()
-}
-
-// GetSlowQueries returns slow query information
-func (dt *DatabaseTools) GetSlowQueries() ([]models.SlowQuery, error) {
-	return dt.tableStatsCollector.GetSlowQueries()
-}
-
-// GetDatabaseSize returns database size information
-func (dt *DatabaseTools) GetDatabaseSize() (*models.DatabaseSize, error) {
-	return dt.databaseStatsCollector.GetDatabaseSize()
-}
-
-// GetActiveConnections returns active connection information
-func (dt *DatabaseTools) GetActiveConnections() ([]models.ActiveConnection, error) {
-	return dt.databaseStatsCollector.GetActiveConnections()
-}
-
 // FindDuplicateData finds duplicate records in a table
-func (dt *DatabaseTools) FindDuplicateData(tableName string, columns []string) (*models.QueryResult, error) {
+func (pg *PostgreSQLDatabase) FindDuplicateData(tableName string, columns []string) (*models.QueryResult, error) {
 	if len(columns) == 0 {
 		return nil, fmt.Errorf("at least one column must be specified")
 	}
@@ -269,5 +247,30 @@ func (dt *DatabaseTools) FindDuplicateData(tableName string, columns []string) (
 		LIMIT 100
 	`, columnList, tableName, columnList)
 
-	return dt.queryExecutor.ExecuteSQL(query)
+	return pg.queryExecutor.ExecuteSQL(query)
+}
+
+// GetTableStats returns statistics for a table
+func (pg *PostgreSQLDatabase) GetTableStats(tableName string) (*models.TableStats, error) {
+	return pg.tableStatsCollector.GetTableStats(tableName)
+}
+
+// GetTableSizes returns size information for all tables
+func (pg *PostgreSQLDatabase) GetTableSizes() ([]map[string]interface{}, error) {
+	return pg.tableStatsCollector.GetTableSizes()
+}
+
+// GetSlowQueries returns slow query information
+func (pg *PostgreSQLDatabase) GetSlowQueries() ([]models.SlowQuery, error) {
+	return pg.tableStatsCollector.GetSlowQueries()
+}
+
+// GetDatabaseSize returns database size information
+func (pg *PostgreSQLDatabase) GetDatabaseSize() (*models.DatabaseSize, error) {
+	return pg.databaseStatsCollector.GetDatabaseSize()
+}
+
+// GetActiveConnections returns active connection information
+func (pg *PostgreSQLDatabase) GetActiveConnections() ([]models.ActiveConnection, error) {
+	return pg.databaseStatsCollector.GetActiveConnections()
 }

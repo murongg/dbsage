@@ -7,7 +7,7 @@ import (
 
 	"dbsage/internal/ai/streaming"
 	"dbsage/internal/ai/tools"
-	"dbsage/pkg/database"
+	"dbsage/pkg/dbinterfaces"
 
 	"github.com/sashabaranov/go-openai"
 )
@@ -23,7 +23,7 @@ type Client struct {
 	toolConfirmConfig   *ToolConfirmationConfig
 }
 
-func NewClient(apiKey, baseURL string, dbTools *database.DatabaseTools) *Client {
+func NewClient(apiKey, baseURL string, dbTools dbinterfaces.DatabaseInterface) *Client {
 	config := openai.DefaultConfig(apiKey)
 	if baseURL != "" {
 		config.BaseURL = baseURL
@@ -38,7 +38,7 @@ func NewClient(apiKey, baseURL string, dbTools *database.DatabaseTools) *Client 
 }
 
 // NewClientWithDynamicTools creates a new client with dynamic database tools getter
-func NewClientWithDynamicTools(apiKey, baseURL string, getDbTools func() *database.DatabaseTools) *Client {
+func NewClientWithDynamicTools(apiKey, baseURL string, getDbTools func() dbinterfaces.DatabaseInterface) *Client {
 	config := openai.DefaultConfig(apiKey)
 	if baseURL != "" {
 		config.BaseURL = baseURL

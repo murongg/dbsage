@@ -5,15 +5,15 @@ import (
 	"strings"
 
 	"dbsage/internal/models"
-	"dbsage/pkg/database"
+	"dbsage/pkg/dbinterfaces"
 )
 
 // CommandHandler handles slash commands and @ database commands
 type CommandHandler struct {
-	connService *database.ConnectionService
+	connService dbinterfaces.ConnectionServiceInterface
 }
 
-func NewCommandHandler(connService *database.ConnectionService) *CommandHandler {
+func NewCommandHandler(connService dbinterfaces.ConnectionServiceInterface) *CommandHandler {
 	return &CommandHandler{
 		connService: connService,
 	}
@@ -156,9 +156,9 @@ func (h *CommandHandler) getHelpMessage() string {
 	return `Available commands:
 
 Database Commands:
-- /add <name>: Add database connection
+- /add <name>: Add database connection (supports postgresql, mysql)
 - /switch <name>: Switch to connection  
-- /list: List all connections
+- /list: List all connections with types
 - /remove <name>: Remove connection
 
 General Commands:
@@ -180,7 +180,7 @@ func (h *CommandHandler) addConnection(name string) (bool, string, error) {
 	}
 
 	// This is a simplified version - in reality you'd need to collect connection details
-	return true, fmt.Sprintf("To add connection '%s', you need to provide:\n- Host\n- Port\n- Database name\n- Username\n- Password\n\nUse the interactive setup or configuration file.", name), nil
+	return true, fmt.Sprintf("To add connection '%s', you need to provide:\n- Database type (postgresql, mysql)\n- Host\n- Port\n- Database name\n- Username\n- Password\n\nSupported database types: postgresql, mysql\nUse the interactive setup or configuration file.", name), nil
 }
 
 // switchConnection switches to a different connection
@@ -223,8 +223,13 @@ func (h *CommandHandler) listConnections() (bool, string, error) {
 			marker = "*"
 		}
 
-		result.WriteString(fmt.Sprintf("%s %s (%s:%d/%s) - %s\n",
-			marker, name, config.Host, config.Port, config.Database, statusStr))
+		dbType := config.Type
+		if dbType == "" {
+			dbType = "unknown"
+		}
+
+		result.WriteString(fmt.Sprintf("%s %s [%s] (%s:%d/%s) - %s\n",
+			marker, name, dbType, config.Host, config.Port, config.Database, statusStr))
 	}
 
 	if current != "" {

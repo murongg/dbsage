@@ -3,45 +3,38 @@ package database
 import (
 	"encoding/json"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
 	"sync"
 	"time"
-)
 
-// ConnectionConfig represents a database connection configuration
-type ConnectionConfig struct {
-	Name        string `json:"name"`
-	Host        string `json:"host"`
-	Port        int    `json:"port"`
-	Database    string `json:"database"`
-	Username    string `json:"username"`
-	Password    string `json:"password"`
-	SSLMode     string `json:"ssl_mode"`
-	Description string `json:"description"`
-	LastUsed    string `json:"last_used,omitempty"` // ISO 8601 timestamp
-}
+	"dbsage/pkg/dbinterfaces"
+)
 
 // ConnectionManager manages multiple database connections
 type ConnectionManager struct {
-	connections map[string]*DatabaseTools
-	configs     map[string]*ConnectionConfig
-	current     string
-	mu          sync.RWMutex
-	configFile  string
+	connections     map[string]dbinterfaces.DatabaseInterface
+	configs         map[string]*dbinterfaces.ConnectionConfig
+	providerManager *ProviderManager
+	current         string
+	mu              sync.RWMutex
+	configFile      string
 }
 
+// Ensure ConnectionManager implements ConnectionManagerInterface
+var _ dbinterfaces.ConnectionManagerInterface = (*ConnectionManager)(nil)
+
 // NewConnectionManager creates a new connection manager
-func NewConnectionManager() *ConnectionManager {
+func NewConnectionManager() dbinterfaces.ConnectionManagerInterface {
 	homeDir, _ := os.UserHomeDir()
 	configFile := filepath.Join(homeDir, ".dbsage", "connections.json")
 
 	cm := &ConnectionManager{
-		connections: make(map[string]*DatabaseTools),
-		configs:     make(map[string]*ConnectionConfig),
-		configFile:  configFile,
+		connections:     make(map[string]dbinterfaces.DatabaseInterface),
+		configs:         make(map[string]*dbinterfaces.ConnectionConfig),
+		providerManager: NewProviderManager(),
+		configFile:      configFile,
 	}
 
 	// Load existing connections
@@ -50,30 +43,18 @@ func NewConnectionManager() *ConnectionManager {
 }
 
 // AddConnection adds a new database connection
-func (cm *ConnectionManager) AddConnection(config *ConnectionConfig) error {
+func (cm *ConnectionManager) AddConnection(config *dbinterfaces.ConnectionConfig) error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
-	// Build connection URL with proper encoding
-	var connURL string
-	if config.Password == "" {
-		connURL = fmt.Sprintf("postgres://%s@%s:%d/%s?sslmode=%s",
-			url.QueryEscape(config.Username), config.Host, config.Port,
-			url.QueryEscape(config.Database), config.SSLMode)
-	} else {
-		connURL = fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s",
-			url.QueryEscape(config.Username), url.QueryEscape(config.Password),
-			config.Host, config.Port, url.QueryEscape(config.Database), config.SSLMode)
-	}
-
-	// Test connection
-	dbTools, err := NewDatabaseTools(connURL)
+	// Create connection using the provider manager
+	dbInterface, err := cm.providerManager.CreateConnection(config)
 	if err != nil {
 		return fmt.Errorf("failed to connect to database: %w", err)
 	}
 
 	// Store connection
-	cm.connections[config.Name] = dbTools
+	cm.connections[config.Name] = dbInterface
 	cm.configs[config.Name] = config
 
 	// Set as current if it's the first connection
@@ -114,11 +95,11 @@ func (cm *ConnectionManager) RemoveConnection(name string) error {
 }
 
 // ListConnections returns all connection configurations
-func (cm *ConnectionManager) ListConnections() map[string]*ConnectionConfig {
+func (cm *ConnectionManager) ListConnections() map[string]*dbinterfaces.ConnectionConfig {
 	cm.mu.RLock()
 	defer cm.mu.RUnlock()
 
-	result := make(map[string]*ConnectionConfig)
+	result := make(map[string]*dbinterfaces.ConnectionConfig)
 	for name, config := range cm.configs {
 		result[name] = config
 	}
@@ -126,7 +107,7 @@ func (cm *ConnectionManager) ListConnections() map[string]*ConnectionConfig {
 }
 
 // GetCurrentConnection returns the current active connection
-func (cm *ConnectionManager) GetCurrentConnection() (*DatabaseTools, string, error) {
+func (cm *ConnectionManager) GetCurrentConnection() (dbinterfaces.DatabaseInterface, string, error) {
 	cm.mu.RLock()
 	defer cm.mu.RUnlock()
 
@@ -159,48 +140,27 @@ func (cm *ConnectionManager) SwitchConnection(name string) error {
 	// Reconnect if connection doesn't exist or check health if it exists
 	if conn, exists := cm.connections[name]; !exists {
 		config := cm.configs[name]
-		var connURL string
-		if config.Password == "" {
-			connURL = fmt.Sprintf("postgres://%s@%s:%d/%s?sslmode=%s",
-				config.Username, config.Host, config.Port,
-				config.Database, config.SSLMode)
-		} else {
-			connURL = fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s",
-				config.Username, config.Password, config.Host, config.Port,
-				config.Database, config.SSLMode)
-		}
-
-		dbTools, err := NewDatabaseTools(connURL)
+		dbInterface, err := cm.providerManager.CreateConnection(config)
 		if err != nil {
 			return fmt.Errorf("failed to reconnect to database '%s': %w", name, err)
 		}
-		cm.connections[name] = dbTools
+		cm.connections[name] = dbInterface
 	} else {
 		// Check existing connection health
 		if err := conn.CheckConnection(); err != nil {
 			// Connection is unhealthy, try to reconnect
 			config := cm.configs[name]
-			var connURL string
-			if config.Password == "" {
-				connURL = fmt.Sprintf("postgres://%s@%s:%d/%s?sslmode=%s",
-					config.Username, config.Host, config.Port,
-					config.Database, config.SSLMode)
-			} else {
-				connURL = fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s",
-					config.Username, config.Password, config.Host, config.Port,
-					config.Database, config.SSLMode)
-			}
 
 			// Close the unhealthy connection
 			conn.Close()
 			delete(cm.connections, name)
 
 			// Create new connection
-			dbTools, err := NewDatabaseTools(connURL)
+			dbInterface, err := cm.providerManager.CreateConnection(config)
 			if err != nil {
 				return fmt.Errorf("failed to reconnect to database '%s' after health check failure: %w", name, err)
 			}
-			cm.connections[name] = dbTools
+			cm.connections[name] = dbInterface
 		}
 	}
 
@@ -224,7 +184,7 @@ func (cm *ConnectionManager) Close() error {
 	for _, conn := range cm.connections {
 		conn.Close()
 	}
-	cm.connections = make(map[string]*DatabaseTools)
+	cm.connections = make(map[string]dbinterfaces.DatabaseInterface)
 	return nil
 }
 
@@ -246,7 +206,7 @@ func (cm *ConnectionManager) loadConnections() error {
 	}
 
 	// Parse JSON
-	var configs map[string]*ConnectionConfig
+	var configs map[string]*dbinterfaces.ConnectionConfig
 	if err := json.Unmarshal(data, &configs); err != nil {
 		return err
 	}

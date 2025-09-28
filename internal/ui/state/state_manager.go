@@ -4,7 +4,7 @@ import (
 	"dbsage/internal/ai"
 	"dbsage/internal/models"
 	"dbsage/internal/ui/handlers"
-	"dbsage/pkg/database"
+	"dbsage/pkg/dbinterfaces"
 
 	"github.com/sashabaranov/go-openai"
 )
@@ -12,8 +12,8 @@ import (
 // StateManager manages the application state
 type StateManager struct {
 	aiClient           *ai.Client
-	dbTools            *database.DatabaseTools
-	connMgr            *database.ConnectionManager
+	dbTools            dbinterfaces.DatabaseInterface
+	connMgr            dbinterfaces.ConnectionManagerInterface
 	cmdHandler         *handlers.CommandHandler
 	history            []openai.ChatCompletionMessage
 	currentState       models.AppState
@@ -32,8 +32,8 @@ type StateManager struct {
 }
 
 // NewStateManager creates a new state manager
-func NewStateManager(aiClient *ai.Client, dbTools *database.DatabaseTools, connService *database.ConnectionService) *StateManager {
-	var connMgr *database.ConnectionManager
+func NewStateManager(aiClient *ai.Client, dbTools dbinterfaces.DatabaseInterface, connService dbinterfaces.ConnectionServiceInterface) *StateManager {
+	var connMgr dbinterfaces.ConnectionManagerInterface
 	if connService != nil {
 		connMgr = connService.GetConnectionManager()
 	}
@@ -160,11 +160,11 @@ func (sm *StateManager) GetAIClient() *ai.Client {
 	return sm.aiClient
 }
 
-func (sm *StateManager) GetDatabaseTools() *database.DatabaseTools {
+func (sm *StateManager) GetDatabaseTools() dbinterfaces.DatabaseInterface {
 	return sm.dbTools
 }
 
-func (sm *StateManager) GetConnectionManager() *database.ConnectionManager {
+func (sm *StateManager) GetConnectionManager() dbinterfaces.ConnectionManagerInterface {
 	return sm.connMgr
 }
 

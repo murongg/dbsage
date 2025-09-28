@@ -4,9 +4,9 @@ import (
 	"log"
 	"os"
 
+	"dbsage/internal/ai"
 	"dbsage/internal/ui"
 	"dbsage/pkg/database"
-	"dbsage/internal/ai"
 )
 
 func main() {

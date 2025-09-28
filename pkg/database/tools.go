@@ -2,93 +2,45 @@ package database
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"strings"
+
+	"dbsage/internal/models"
+	"dbsage/pkg/database/queries"
+	"dbsage/pkg/database/stats"
 
 	_ "github.com/lib/pq"
 )
 
+// DatabaseTools provides high-level database operations
 type DatabaseTools struct {
-	db *sql.DB
+	db                     *sql.DB
+	queryExecutor          *queries.Executor
+	tableStatsCollector    *stats.TableStatsCollector
+	databaseStatsCollector *stats.DatabaseStatsCollector
 }
 
-type QueryResult struct {
-	Columns []string                 `json:"columns"`
-	Rows    []map[string]interface{} `json:"rows"`
-	Error   string                   `json:"error,omitempty"`
-}
-
-type TableInfo struct {
-	TableName string `json:"table_name"`
-}
-
-type ColumnInfo struct {
-	ColumnName             string  `json:"column_name"`
-	DataType               string  `json:"data_type"`
-	IsNullable             string  `json:"is_nullable"`
-	ColumnDefault          *string `json:"column_default"`
-	CharacterMaximumLength *int    `json:"character_maximum_length"`
-}
-
-type IndexInfo struct {
-	IndexName string `json:"indexname"`
-	IndexDef  string `json:"indexdef"`
-}
-
-type TableStats struct {
-	SchemaName      string      `json:"schemaname"`
-	TableName       string      `json:"tablename"`
-	AttName         string      `json:"attname"`
-	NDistinct       *float64    `json:"n_distinct"`
-	MostCommonVals  interface{} `json:"most_common_vals"`
-	MostCommonFreqs interface{} `json:"most_common_freqs"`
-}
-
-type SlowQuery struct {
-	Query     string  `json:"query"`
-	Calls     int64   `json:"calls"`
-	TotalTime float64 `json:"total_time"`
-	MeanTime  float64 `json:"mean_time"`
-	Rows      int64   `json:"rows"`
-}
-
-type DatabaseSize struct {
-	DatName string `json:"datname"`
-	Size    string `json:"size"`
-}
-
-type TableSize struct {
-	SchemaName string `json:"schemaname"`
-	TableName  string `json:"tablename"`
-	Size       string `json:"size"`
-	TableSize  string `json:"table_size"`
-	IndexSize  string `json:"index_size"`
-}
-
-type ActiveConnection struct {
-	PID             int     `json:"pid"`
-	Username        string  `json:"usename"`
-	ApplicationName string  `json:"application_name"`
-	ClientAddr      *string `json:"client_addr"`
-	State           string  `json:"state"`
-	QueryStart      *string `json:"query_start"`
-	QueryPreview    string  `json:"query_preview"`
-}
-
-func NewDatabaseTools(databaseURL string) (*DatabaseTools, error) {
-	db, err := sql.Open("postgres", databaseURL)
+// NewDatabaseTools creates a new database tools instance
+func NewDatabaseTools(connectionURL string) (*DatabaseTools, error) {
+	db, err := sql.Open("postgres", connectionURL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to database: %w", err)
+		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
 	if err := db.Ping(); err != nil {
+		db.Close()
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	return &DatabaseTools{db: db}, nil
+	return &DatabaseTools{
+		db:                     db,
+		queryExecutor:          queries.NewExecutor(db),
+		tableStatsCollector:    stats.NewTableStatsCollector(db),
+		databaseStatsCollector: stats.NewDatabaseStatsCollector(db),
+	}, nil
 }
 
+// Close closes the database connection
 func (dt *DatabaseTools) Close() error {
 	if dt.db != nil {
 		return dt.db.Close()
@@ -96,90 +48,58 @@ func (dt *DatabaseTools) Close() error {
 	return nil
 }
 
-// CheckConnection verifies that the database connection is healthy
+// IsConnectionHealthy checks if the database connection is healthy
+func (dt *DatabaseTools) IsConnectionHealthy() bool {
+	if dt.db == nil {
+		return false
+	}
+	return dt.db.Ping() == nil
+}
+
+// CheckConnection checks if the database connection is working
 func (dt *DatabaseTools) CheckConnection() error {
-	if dt == nil || dt.db == nil {
+	if dt.db == nil {
 		return fmt.Errorf("database connection is nil")
 	}
-
-	// Use ping to check if connection is alive
-	if err := dt.db.Ping(); err != nil {
-		return fmt.Errorf("database connection check failed: %w", err)
-	}
-
-	return nil
+	return dt.db.Ping()
 }
 
-// IsConnectionHealthy returns true if the database connection is healthy
-func (dt *DatabaseTools) IsConnectionHealthy() bool {
-	return dt.CheckConnection() == nil
+// ExecuteSQL executes a SQL query
+func (dt *DatabaseTools) ExecuteSQL(query string) (*models.QueryResult, error) {
+	return dt.queryExecutor.ExecuteSQL(query)
 }
 
-func (dt *DatabaseTools) ExecuteSQL(query string) (*QueryResult, error) {
-	if dt == nil || dt.db == nil {
-		return &QueryResult{
-			Error: "No database connection available. Please add and switch to a database connection first.",
-		}, fmt.Errorf("no database connection available")
-	}
+// ExplainQuery analyzes a query's execution plan
+func (dt *DatabaseTools) ExplainQuery(query string) (*models.QueryResult, error) {
+	return dt.queryExecutor.ExplainQuery(query)
+}
+
+// GetAllTables returns a list of all tables
+func (dt *DatabaseTools) GetAllTables() ([]models.TableInfo, error) {
+	query := `
+		SELECT 
+			table_name,
+			table_schema,
+			table_type,
+			COALESCE(obj_description(c.oid), '') as table_comment
+		FROM information_schema.tables t
+		LEFT JOIN pg_class c ON c.relname = t.table_name
+		WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
+		ORDER BY table_schema, table_name
+	`
 
 	rows, err := dt.db.Query(query)
 	if err != nil {
-		return &QueryResult{Error: err.Error()}, nil
+		return nil, fmt.Errorf("failed to query tables: %w", err)
 	}
 	defer rows.Close()
 
-	columns, err := rows.Columns()
-	if err != nil {
-		return &QueryResult{Error: err.Error()}, nil
-	}
-
-	var results []map[string]interface{}
+	var tables []models.TableInfo
 	for rows.Next() {
-		values := make([]interface{}, len(columns))
-		valuePtrs := make([]interface{}, len(columns))
-		for i := range values {
-			valuePtrs[i] = &values[i]
-		}
-
-		if err := rows.Scan(valuePtrs...); err != nil {
-			return &QueryResult{Error: err.Error()}, nil
-		}
-
-		row := make(map[string]interface{})
-		for i, col := range columns {
-			val := values[i]
-			if b, ok := val.([]byte); ok {
-				row[col] = string(b)
-			} else {
-				row[col] = val
-			}
-		}
-		results = append(results, row)
-	}
-
-	return &QueryResult{
-		Columns: columns,
-		Rows:    results,
-	}, nil
-}
-
-func (dt *DatabaseTools) GetAllTables() ([]TableInfo, error) {
-	if dt == nil || dt.db == nil {
-		return nil, fmt.Errorf("no database connection available")
-	}
-
-	query := `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'`
-	rows, err := dt.db.Query(query)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var tables []TableInfo
-	for rows.Next() {
-		var table TableInfo
-		if err := rows.Scan(&table.TableName); err != nil {
-			return nil, err
+		var table models.TableInfo
+		err := rows.Scan(&table.TableName, &table.Schema, &table.TableType, &table.Description)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan table row: %w", err)
 		}
 		tables = append(tables, table)
 	}
@@ -187,34 +107,62 @@ func (dt *DatabaseTools) GetAllTables() ([]TableInfo, error) {
 	return tables, nil
 }
 
-func (dt *DatabaseTools) GetTableSchema(tableName string) ([]ColumnInfo, error) {
-	if dt == nil || dt.db == nil {
-		return nil, fmt.Errorf("no database connection available")
-	}
-
+// GetTableSchema returns detailed schema information for a table
+func (dt *DatabaseTools) GetTableSchema(tableName string) ([]models.ColumnInfo, error) {
 	query := `
 		SELECT 
-			column_name, 
-			data_type, 
-			is_nullable, 
+			column_name,
+			data_type,
+			is_nullable,
 			column_default,
-			character_maximum_length
-		FROM information_schema.columns 
-		WHERE table_name = $1
-		ORDER BY ordinal_position
+			character_maximum_length,
+			numeric_precision,
+			numeric_scale,
+			CASE WHEN pk.column_name IS NOT NULL THEN true ELSE false END as is_primary_key,
+			CASE WHEN fk.column_name IS NOT NULL THEN true ELSE false END as is_foreign_key,
+			COALESCE(col_description(c.oid, a.attnum), '') as description
+		FROM information_schema.columns isc
+		LEFT JOIN pg_class c ON c.relname = isc.table_name
+		LEFT JOIN pg_attribute a ON a.attrelid = c.oid AND a.attname = isc.column_name
+		LEFT JOIN (
+			SELECT ku.column_name
+			FROM information_schema.table_constraints tc
+			JOIN information_schema.key_column_usage ku ON tc.constraint_name = ku.constraint_name
+			WHERE tc.constraint_type = 'PRIMARY KEY' AND tc.table_name = $1
+		) pk ON pk.column_name = isc.column_name
+		LEFT JOIN (
+			SELECT ku.column_name
+			FROM information_schema.table_constraints tc
+			JOIN information_schema.key_column_usage ku ON tc.constraint_name = ku.constraint_name
+			WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_name = $1
+		) fk ON fk.column_name = isc.column_name
+		WHERE isc.table_name = $1
+		ORDER BY isc.ordinal_position
 	`
+
 	rows, err := dt.db.Query(query, tableName)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to query table schema: %w", err)
 	}
 	defer rows.Close()
 
-	var columns []ColumnInfo
+	var columns []models.ColumnInfo
 	for rows.Next() {
-		var col ColumnInfo
-		if err := rows.Scan(&col.ColumnName, &col.DataType, &col.IsNullable,
-			&col.ColumnDefault, &col.CharacterMaximumLength); err != nil {
-			return nil, err
+		var col models.ColumnInfo
+		err := rows.Scan(
+			&col.ColumnName,
+			&col.DataType,
+			&col.IsNullable,
+			&col.DefaultValue,
+			&col.CharMaxLength,
+			&col.NumPrecision,
+			&col.NumScale,
+			&col.IsPrimaryKey,
+			&col.IsForeignKey,
+			&col.Description,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan column row: %w", err)
 		}
 		columns = append(columns, col)
 	}
@@ -222,202 +170,104 @@ func (dt *DatabaseTools) GetTableSchema(tableName string) ([]ColumnInfo, error) 
 	return columns, nil
 }
 
-func (dt *DatabaseTools) ExplainQuery(query string) (interface{}, error) {
-	explainQuery := fmt.Sprintf("EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) %s", query)
-	row := dt.db.QueryRow(explainQuery)
-
-	var result string
-	if err := row.Scan(&result); err != nil {
-		return nil, err
-	}
-
-	var jsonResult interface{}
-	if err := json.Unmarshal([]byte(result), &jsonResult); err != nil {
-		return nil, err
-	}
-
-	return jsonResult, nil
-}
-
-func (dt *DatabaseTools) GetTableIndexes(tableName string) ([]IndexInfo, error) {
+// GetTableIndexes returns index information for a table
+func (dt *DatabaseTools) GetTableIndexes(tableName string) ([]models.IndexInfo, error) {
 	query := `
 		SELECT 
-			indexname,
-			indexdef
-		FROM pg_indexes 
-		WHERE tablename = $1
+			i.relname as index_name,
+			idx.indisunique as is_unique,
+			idx.indisprimary as is_primary,
+			array_agg(a.attname ORDER BY a.attnum) as columns,
+			am.amname as index_type,
+			COALESCE(ts.spcname, 'default') as tablespace,
+			COALESCE(obj_description(i.oid), '') as description
+		FROM pg_index idx
+		JOIN pg_class i ON i.oid = idx.indexrelid
+		JOIN pg_class t ON t.oid = idx.indrelid
+		JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(idx.indkey)
+		JOIN pg_am am ON am.oid = i.relam
+		LEFT JOIN pg_tablespace ts ON ts.oid = i.reltablespace
+		WHERE t.relname = $1
+		GROUP BY i.relname, idx.indisunique, idx.indisprimary, am.amname, ts.spcname, i.oid
+		ORDER BY i.relname
 	`
+
 	rows, err := dt.db.Query(query, tableName)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to query table indexes: %w", err)
 	}
 	defer rows.Close()
 
-	var indexes []IndexInfo
+	var indexes []models.IndexInfo
 	for rows.Next() {
-		var idx IndexInfo
-		if err := rows.Scan(&idx.IndexName, &idx.IndexDef); err != nil {
-			return nil, err
+		var idx models.IndexInfo
+		var columnsArray string
+		err := rows.Scan(
+			&idx.IndexName,
+			&idx.IsUnique,
+			&idx.IsPrimary,
+			&columnsArray,
+			&idx.IndexType,
+			&idx.TableSpace,
+			&idx.Description,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan index row: %w", err)
 		}
+
+		// Parse the columns array (PostgreSQL array format)
+		// This is a simplified parser - you might want to use a proper array parser
+		columnsArray = strings.Trim(columnsArray, "{}")
+		if columnsArray != "" {
+			idx.Columns = strings.Split(columnsArray, ",")
+		}
+
 		indexes = append(indexes, idx)
 	}
 
 	return indexes, nil
 }
 
-func (dt *DatabaseTools) GetTableStats(tableName string) ([]TableStats, error) {
-	query := `
-		SELECT 
-			schemaname,
-			tablename,
-			attname,
-			n_distinct,
-			most_common_vals,
-			most_common_freqs
-		FROM pg_stats 
-		WHERE tablename = $1
-	`
-	rows, err := dt.db.Query(query, tableName)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var stats []TableStats
-	for rows.Next() {
-		var stat TableStats
-		if err := rows.Scan(&stat.SchemaName, &stat.TableName, &stat.AttName,
-			&stat.NDistinct, &stat.MostCommonVals, &stat.MostCommonFreqs); err != nil {
-			return nil, err
-		}
-		stats = append(stats, stat)
-	}
-
-	return stats, nil
+// GetTableStats returns statistics for a table
+func (dt *DatabaseTools) GetTableStats(tableName string) (*models.TableStats, error) {
+	return dt.tableStatsCollector.GetTableStats(tableName)
 }
 
-func (dt *DatabaseTools) FindDuplicateData(tableName string, columns []string) (*QueryResult, error) {
+// GetTableSizes returns size information for all tables
+func (dt *DatabaseTools) GetTableSizes() ([]map[string]interface{}, error) {
+	return dt.tableStatsCollector.GetTableSizes()
+}
+
+// GetSlowQueries returns slow query information
+func (dt *DatabaseTools) GetSlowQueries() ([]models.SlowQuery, error) {
+	return dt.tableStatsCollector.GetSlowQueries()
+}
+
+// GetDatabaseSize returns database size information
+func (dt *DatabaseTools) GetDatabaseSize() (*models.DatabaseSize, error) {
+	return dt.databaseStatsCollector.GetDatabaseSize()
+}
+
+// GetActiveConnections returns active connection information
+func (dt *DatabaseTools) GetActiveConnections() ([]models.ActiveConnection, error) {
+	return dt.databaseStatsCollector.GetActiveConnections()
+}
+
+// FindDuplicateData finds duplicate records in a table
+func (dt *DatabaseTools) FindDuplicateData(tableName string, columns []string) (*models.QueryResult, error) {
+	if len(columns) == 0 {
+		return nil, fmt.Errorf("at least one column must be specified")
+	}
+
 	columnList := strings.Join(columns, ", ")
 	query := fmt.Sprintf(`
 		SELECT %s, COUNT(*) as duplicate_count
 		FROM %s
 		GROUP BY %s
 		HAVING COUNT(*) > 1
-		ORDER BY duplicate_count DESC
+		ORDER BY COUNT(*) DESC
 		LIMIT 100
 	`, columnList, tableName, columnList)
 
-	return dt.ExecuteSQL(query)
-}
-
-func (dt *DatabaseTools) GetSlowQueries() ([]SlowQuery, error) {
-	query := `
-		SELECT 
-			query,
-			calls,
-			total_time,
-			mean_time,
-			rows
-		FROM pg_stat_statements 
-		ORDER BY total_time DESC 
-		LIMIT 10
-	`
-	rows, err := dt.db.Query(query)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var queries []SlowQuery
-	for rows.Next() {
-		var q SlowQuery
-		if err := rows.Scan(&q.Query, &q.Calls, &q.TotalTime, &q.MeanTime, &q.Rows); err != nil {
-			return nil, err
-		}
-		queries = append(queries, q)
-	}
-
-	return queries, nil
-}
-
-func (dt *DatabaseTools) GetDatabaseSize() (*DatabaseSize, error) {
-	query := `
-		SELECT 
-			pg_database.datname,
-			pg_size_pretty(pg_database_size(pg_database.datname)) AS size
-		FROM pg_database
-		WHERE datname = current_database()
-	`
-	row := dt.db.QueryRow(query)
-
-	var size DatabaseSize
-	if err := row.Scan(&size.DatName, &size.Size); err != nil {
-		return nil, err
-	}
-
-	return &size, nil
-}
-
-func (dt *DatabaseTools) GetTableSizes() ([]TableSize, error) {
-	query := `
-		SELECT 
-			schemaname,
-			tablename,
-			pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) AS size,
-			pg_size_pretty(pg_relation_size(schemaname||'.'||tablename)) AS table_size,
-			pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename) - pg_relation_size(schemaname||'.'||tablename)) AS index_size
-		FROM pg_tables 
-		WHERE schemaname = 'public'
-		ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC
-	`
-	rows, err := dt.db.Query(query)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var sizes []TableSize
-	for rows.Next() {
-		var size TableSize
-		if err := rows.Scan(&size.SchemaName, &size.TableName, &size.Size,
-			&size.TableSize, &size.IndexSize); err != nil {
-			return nil, err
-		}
-		sizes = append(sizes, size)
-	}
-
-	return sizes, nil
-}
-
-func (dt *DatabaseTools) GetActiveConnections() ([]ActiveConnection, error) {
-	query := `
-		SELECT 
-			pid,
-			usename,
-			application_name,
-			client_addr,
-			state,
-			query_start,
-			LEFT(query, 100) as query_preview
-		FROM pg_stat_activity 
-		WHERE state != 'idle'
-		ORDER BY query_start DESC
-	`
-	rows, err := dt.db.Query(query)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var connections []ActiveConnection
-	for rows.Next() {
-		var conn ActiveConnection
-		if err := rows.Scan(&conn.PID, &conn.Username, &conn.ApplicationName,
-			&conn.ClientAddr, &conn.State, &conn.QueryStart, &conn.QueryPreview); err != nil {
-			return nil, err
-		}
-		connections = append(connections, conn)
-	}
-
-	return connections, nil
+	return dt.queryExecutor.ExecuteSQL(query)
 }

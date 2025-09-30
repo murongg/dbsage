@@ -250,13 +250,31 @@ set "DOWNLOAD_URL=https://github.com/murongg/dbsage/releases/download/!TARGET_VE
 
 echo %INFO% Download URL: !DOWNLOAD_URL!
 
-REM Download using PowerShell
-echo %INFO% Downloading archive...
-powershell -Command "Invoke-WebRequest -Uri '!DOWNLOAD_URL!' -OutFile '!ARCHIVE_NAME!'" 2>nul
-if !errorlevel! neq 0 (
-    echo %RED%%ERROR% Failed to download binary from !DOWNLOAD_URL!%NC%
-    echo %INFO% Available releases: https://github.com/murongg/dbsage/releases%NC%
-    exit /b 1
+REM Setup cache directory
+set "CACHE_DIR=%USERPROFILE%\.cache\dbsage"
+set "CACHED_FILE=%CACHE_DIR%\!TARGET_VERSION!_!ARCHIVE_NAME!"
+
+if not exist "%CACHE_DIR%" mkdir "%CACHE_DIR%"
+
+REM Check for cached version
+if exist "!CACHED_FILE!" (
+    echo %INFO% Using cached binary: !CACHED_FILE!
+    copy "!CACHED_FILE!" "!ARCHIVE_NAME!" >nul
+) else (
+    REM Download using PowerShell
+    echo %INFO% Downloading archive...
+    powershell -Command "Invoke-WebRequest -Uri '!DOWNLOAD_URL!' -OutFile '!ARCHIVE_NAME!'" 2>nul
+    if !errorlevel! neq 0 (
+        echo %RED%%ERROR% Failed to download binary from !DOWNLOAD_URL!%NC%
+        echo %INFO% Available releases: https://github.com/murongg/dbsage/releases%NC%
+        exit /b 1
+    )
+    
+    REM Cache the downloaded file
+    copy "!ARCHIVE_NAME!" "!CACHED_FILE!" >nul
+    if !errorlevel! equ 0 (
+        echo %INFO% Binary cached for future installations
+    )
 )
 
 REM Extract archive

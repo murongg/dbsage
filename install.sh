@@ -224,17 +224,34 @@ download_binary() {
     # Determine archive name based on platform
     local archive_name="dbsage_${platform}.tar.gz"
     local download_url="https://github.com/murongg/dbsage/releases/download/${version}/${archive_name}"
+    local cache_dir="$HOME/.cache/dbsage"
+    local cached_file="$cache_dir/${version}_${archive_name}"
     
-    print_info "Download URL: $download_url"
+    # Create cache directory if it doesn't exist
+    mkdir -p "$cache_dir"
     
-    # Download the archive
-    if command -v curl >/dev/null 2>&1; then
-        curl -L -o "$archive_name" "$download_url"
-    elif command -v wget >/dev/null 2>&1; then
-        wget -O "$archive_name" "$download_url"
+    # Check if we have a cached version
+    if [ -f "$cached_file" ]; then
+        print_info "Using cached binary: $cached_file"
+        cp "$cached_file" "$archive_name"
     else
-        print_error "Neither curl nor wget is available"
-        exit 1
+        print_info "Download URL: $download_url"
+        
+        # Download the archive
+        if command -v curl >/dev/null 2>&1; then
+            curl -L -o "$archive_name" "$download_url"
+        elif command -v wget >/dev/null 2>&1; then
+            wget -O "$archive_name" "$download_url"
+        else
+            print_error "Neither curl nor wget is available"
+            exit 1
+        fi
+        
+        # Cache the downloaded file for future use
+        if [ $? -eq 0 ]; then
+            cp "$archive_name" "$cached_file"
+            print_info "Binary cached for future installations"
+        fi
     fi
     
     if [ $? -ne 0 ]; then

@@ -29,16 +29,16 @@ type TableInfo struct {
 
 // ColumnInfo represents column information
 type ColumnInfo struct {
-	ColumnName    string `json:"column_name"`
-	DataType      string `json:"data_type"`
-	IsNullable    string `json:"is_nullable"`
-	DefaultValue  string `json:"default_value"`
-	CharMaxLength *int   `json:"character_maximum_length,omitempty"`
-	NumPrecision  *int   `json:"numeric_precision,omitempty"`
-	NumScale      *int   `json:"numeric_scale,omitempty"`
-	IsPrimaryKey  bool   `json:"is_primary_key"`
-	IsForeignKey  bool   `json:"is_foreign_key"`
-	Description   string `json:"description"`
+	ColumnName    string  `json:"column_name"`
+	DataType      string  `json:"data_type"`
+	IsNullable    string  `json:"is_nullable"`
+	DefaultValue  *string `json:"default_value,omitempty"`
+	CharMaxLength *int    `json:"character_maximum_length,omitempty"`
+	NumPrecision  *int    `json:"numeric_precision,omitempty"`
+	NumScale      *int    `json:"numeric_scale,omitempty"`
+	IsPrimaryKey  bool    `json:"is_primary_key"`
+	IsForeignKey  bool    `json:"is_foreign_key"`
+	Description   string  `json:"description"`
 }
 
 // IndexInfo represents index information

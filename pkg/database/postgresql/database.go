@@ -115,31 +115,31 @@ func (pg *PostgreSQLDatabase) GetAllTables() ([]models.TableInfo, error) {
 func (pg *PostgreSQLDatabase) GetTableSchema(tableName string) ([]models.ColumnInfo, error) {
 	query := `
 		SELECT 
-			column_name,
-			data_type,
-			is_nullable,
-			column_default,
-			character_maximum_length,
-			numeric_precision,
-			numeric_scale,
-			CASE WHEN pk.column_name IS NOT NULL THEN true ELSE false END as is_primary_key,
-			CASE WHEN fk.column_name IS NOT NULL THEN true ELSE false END as is_foreign_key,
+			isc."column_name",
+			isc.data_type,
+			isc.is_nullable,
+			isc.column_default,
+			isc.character_maximum_length,
+			isc.numeric_precision,
+			isc.numeric_scale,
+			CASE WHEN pk."column_name" IS NOT NULL THEN true ELSE false END as is_primary_key,
+			CASE WHEN fk."column_name" IS NOT NULL THEN true ELSE false END as is_foreign_key,
 			COALESCE(col_description(c.oid, a.attnum), '') as description
 		FROM information_schema.columns isc
 		LEFT JOIN pg_class c ON c.relname = isc.table_name
-		LEFT JOIN pg_attribute a ON a.attrelid = c.oid AND a.attname = isc.column_name
+		LEFT JOIN pg_attribute a ON a.attrelid = c.oid AND a.attname = isc."column_name"
 		LEFT JOIN (
-			SELECT ku.column_name
+			SELECT ku."column_name"
 			FROM information_schema.table_constraints tc
 			JOIN information_schema.key_column_usage ku ON tc.constraint_name = ku.constraint_name
 			WHERE tc.constraint_type = 'PRIMARY KEY' AND tc.table_name = $1
-		) pk ON pk.column_name = isc.column_name
+		) pk ON pk."column_name" = isc."column_name"
 		LEFT JOIN (
-			SELECT ku.column_name
+			SELECT ku."column_name"
 			FROM information_schema.table_constraints tc
 			JOIN information_schema.key_column_usage ku ON tc.constraint_name = ku.constraint_name
 			WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_name = $1
-		) fk ON fk.column_name = isc.column_name
+		) fk ON fk."column_name" = isc."column_name"
 		WHERE isc.table_name = $1
 		ORDER BY isc.ordinal_position
 	`
@@ -153,21 +153,32 @@ func (pg *PostgreSQLDatabase) GetTableSchema(tableName string) ([]models.ColumnI
 	var columns []models.ColumnInfo
 	for rows.Next() {
 		var col models.ColumnInfo
+		var defaultValue sql.NullString
+		var description sql.NullString
 		err := rows.Scan(
 			&col.ColumnName,
 			&col.DataType,
 			&col.IsNullable,
-			&col.DefaultValue,
+			&defaultValue,
 			&col.CharMaxLength,
 			&col.NumPrecision,
 			&col.NumScale,
 			&col.IsPrimaryKey,
 			&col.IsForeignKey,
-			&col.Description,
+			&description,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan column row: %w", err)
 		}
+
+		// Handle nullable fields
+		if defaultValue.Valid {
+			col.DefaultValue = &defaultValue.String
+		}
+		if description.Valid {
+			col.Description = description.String
+		}
+
 		columns = append(columns, col)
 	}
 

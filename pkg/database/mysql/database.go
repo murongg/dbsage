@@ -112,22 +112,20 @@ func (m *MySQLDatabase) GetAllTables() ([]models.TableInfo, error) {
 
 // GetTableSchema returns detailed schema information for a table
 func (m *MySQLDatabase) GetTableSchema(tableName string) ([]models.ColumnInfo, error) {
-	query := `
-		SELECT 
-			column_name,
-			data_type,
-			is_nullable,
-			column_default,
-			character_maximum_length,
-			numeric_precision,
-			numeric_scale,
-			CASE WHEN column_key = 'PRI' THEN true ELSE false END as is_primary_key,
-			CASE WHEN column_key = 'MUL' THEN true ELSE false END as is_foreign_key,
-			COALESCE(column_comment, '') as description
-		FROM information_schema.columns
-		WHERE table_schema = DATABASE() AND table_name = ?
-		ORDER BY ordinal_position
-	`
+	query := "SELECT " +
+		"`column_name`, " +
+		"data_type, " +
+		"is_nullable, " +
+		"column_default, " +
+		"character_maximum_length, " +
+		"numeric_precision, " +
+		"numeric_scale, " +
+		"CASE WHEN column_key = 'PRI' THEN true ELSE false END as is_primary_key, " +
+		"CASE WHEN column_key = 'MUL' THEN true ELSE false END as is_foreign_key, " +
+		"COALESCE(column_comment, '') as description " +
+		"FROM information_schema.columns " +
+		"WHERE table_schema = DATABASE() AND table_name = ? " +
+		"ORDER BY ordinal_position"
 
 	rows, err := m.db.Query(query, tableName)
 	if err != nil {
@@ -138,21 +136,32 @@ func (m *MySQLDatabase) GetTableSchema(tableName string) ([]models.ColumnInfo, e
 	var columns []models.ColumnInfo
 	for rows.Next() {
 		var col models.ColumnInfo
+		var defaultValue sql.NullString
+		var description sql.NullString
 		err := rows.Scan(
 			&col.ColumnName,
 			&col.DataType,
 			&col.IsNullable,
-			&col.DefaultValue,
+			&defaultValue,
 			&col.CharMaxLength,
 			&col.NumPrecision,
 			&col.NumScale,
 			&col.IsPrimaryKey,
 			&col.IsForeignKey,
-			&col.Description,
+			&description,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan column row: %w", err)
 		}
+
+		// Handle nullable fields
+		if defaultValue.Valid {
+			col.DefaultValue = &defaultValue.String
+		}
+		if description.Valid {
+			col.Description = description.String
+		}
+
 		columns = append(columns, col)
 	}
 
@@ -161,20 +170,18 @@ func (m *MySQLDatabase) GetTableSchema(tableName string) ([]models.ColumnInfo, e
 
 // GetTableIndexes returns index information for a table
 func (m *MySQLDatabase) GetTableIndexes(tableName string) ([]models.IndexInfo, error) {
-	query := `
-		SELECT 
-			index_name,
-			CASE WHEN non_unique = 0 THEN true ELSE false END as is_unique,
-			CASE WHEN index_name = 'PRIMARY' THEN true ELSE false END as is_primary,
-			GROUP_CONCAT(column_name ORDER BY seq_in_index) as columns,
-			index_type,
-			'' as tablespace,
-			COALESCE(index_comment, '') as description
-		FROM information_schema.statistics
-		WHERE table_schema = DATABASE() AND table_name = ?
-		GROUP BY index_name, non_unique, index_type, index_comment
-		ORDER BY index_name
-	`
+	query := "SELECT " +
+		"index_name, " +
+		"CASE WHEN non_unique = 0 THEN true ELSE false END as is_unique, " +
+		"CASE WHEN index_name = 'PRIMARY' THEN true ELSE false END as is_primary, " +
+		"GROUP_CONCAT(`column_name` ORDER BY seq_in_index) as columns, " +
+		"index_type, " +
+		"'' as tablespace, " +
+		"COALESCE(index_comment, '') as description " +
+		"FROM information_schema.statistics " +
+		"WHERE table_schema = DATABASE() AND table_name = ? " +
+		"GROUP BY index_name, non_unique, index_type, index_comment " +
+		"ORDER BY index_name"
 
 	rows, err := m.db.Query(query, tableName)
 	if err != nil {

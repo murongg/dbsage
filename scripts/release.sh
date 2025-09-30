@@ -123,7 +123,10 @@ increment_version() {
     local increment_type=$1
     local current_version=$(get_current_version)
     
-    print_info "Current version: $current_version"
+    # Print to stderr to avoid mixing with return value
+    print_info "Current version: $current_version" >&2
+    
+    # Parse the current version
     parse_version "$current_version"
     
     case $increment_type in
@@ -145,8 +148,8 @@ increment_version() {
             ;;
     esac
     
-    NEW_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
-    echo "$NEW_VERSION"
+    local new_version="v${MAJOR}.${MINOR}.${PATCH}"
+    echo "$new_version"
 }
 
 # Validate git status

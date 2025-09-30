@@ -1,50 +1,56 @@
-# DBSage - Database Sage
+# DBSage - Database AI Assistant
 
-A PostgreSQL database AI management tool built with Go, focused on intelligent database operations and analysis.
+An intelligent database management tool built with Go, focused on AI-driven operations and analysis for PostgreSQL, MySQL, and SQLite databases.
 
-> **Note**: This is currently an MVP (Minimum Viable Product) version. Features and functionality are under active development.
+> **Note**: This is currently an MVP version with features under active development.
 
 ## Core Features
 
-### AI Intelligence
 - **Natural Language Queries** - Describe your needs in natural language, automatically generates SQL
 - **Smart Tool Selection** - Automatically chooses appropriate database tools
-- **Multi-step Analysis** - Supports complex recursive task processing
-- **Safety Checks** - Automatically identifies dangerous operations and provides alerts
-
-### Database Operations
-- **SQL Execution** - Safely execute SQL queries
-- **Table Management** - View all tables and table structures
 - **Performance Analysis** - EXPLAIN query analysis and slow query detection
-- **Index Management** - View and analyze table indexes
-- **Data Statistics** - Get table statistics and data analysis
+- **Index Suggestions** - AI-powered index optimization recommendations
+- **Safety Checks** - Automatically identifies dangerous operations and provides warnings
+- **Multi-step Analysis** - Supports complex recursive task processing
 
-### Advanced Query Optimization
-- **Query Performance Analysis** - Comprehensive analysis of query execution plans
-- **Index Suggestions** - AI-powered recommendations for optimal indexing
-- **Query Pattern Analysis** - Identify and optimize frequent query patterns
-- **Query Optimization** - Automated suggestions for query improvements
-- **Table Performance Analysis** - Deep dive into table-specific performance issues
-- **Bottleneck Detection** - Identify and resolve database performance bottlenecks
+## Installation Guide
 
-## Quick Start
+### System Requirements
+- **Operating System**: Linux, macOS, Windows
+- **API Requirements**: OpenAI API Key
 
-### Requirements
-- Go 1.21+
-- OpenAI API Key
+### One-Click Installation
 
-### Installation
-
+#### Linux / macOS
 ```bash
-# 1. Enter project directory
-cd go/
+# One-click installation
+curl -fsSL https://raw.githubusercontent.com/murongg/dbsage/main/install.sh | bash
 
-# 2. Initialize setup
+# Or download and run
+wget https://raw.githubusercontent.com/murongg/dbsage/main/install.sh
+chmod +x install.sh
+./install.sh
+```
+
+#### Windows
+```powershell
+# Download and run installation script
+# 1. Download install.bat script
+# 2. Right-click "Run as administrator"
+```
+
+#### Manual Installation
+```bash
+# 1. Clone repository
+git clone https://github.com/murongg/dbsage.git
+cd dbsage/go
+
+# 2. Install dependencies and build
 make setup
 
-# 3. Edit configuration file
+# 3. Configure environment variables
 nano .env
-# Set your OPENAI_API_KEY and OPENAI_BASE_URL
+# Set OPENAI_API_KEY and OPENAI_BASE_URL
 
 # 4. Run the program
 make run
@@ -53,132 +59,102 @@ make run
 ### Configuration Example
 
 ```bash
-# Environment variables
-export OPENAI_API_KEY="your_openai_api_key_here"
-export OPENAI_BASE_URL="your_openai_base_url_here"
+# Configuration file ~/.dbsage/config.env
+OPENAI_API_KEY=your_openai_api_key_here
+OPENAI_BASE_URL=https://api.openai.com/v1
 
-# Run directly
-go run cmd/dbsage/main.go
+# Database connection (optional, can also be added at runtime)
+DATABASE_URL=postgres://username:password@localhost:5432/database?sslmode=disable
+
+# Other configurations
+LOG_LEVEL=info
+MAX_CONNECTIONS=10
+TIMEOUT=30s
 ```
+
+## Quick Start
+
+After installation, follow these steps to get started:
+
+1. **Configure API Key**
+   ```bash
+   # Edit configuration file
+   nano ~/.dbsage/config.env
+   # Set OPENAI_API_KEY=your_api_key_here
+   ```
+
+2. **Launch DBSage**
+   ```bash
+   dbsage
+   ```
+
+3. **Add Database Connection**
+   ```bash
+   # Run in DBSage
+   /add mydb
+   # Follow prompts to enter database connection information
+   ```
 
 ## Usage Examples
 
 ```
-You: Help me query the first 10 records from the users table
-DBSage: I'll query the first 10 records from the users table for you.
+You: Query the first 10 records from the users table
+DBSage: SELECT * FROM users LIMIT 10;
 
-Execute SQL: SELECT * FROM users LIMIT 10;
+You: Analyze database performance bottlenecks
+DBSage: Analyzing database performance, getting slow query list...
 
-Query results: ...
-
-You: Analyze the performance bottlenecks of this database
-DBSage: I'll help you analyze database performance, starting with slow queries...
-
-Get slow queries list
-Get all table sizes
-Get active connection information
-
-Based on the analysis results, the following performance issues were found: ...
-
-You: Suggest indexes for my users table
-DBSage: I'll analyze the users table and suggest optimal indexes...
-
-Analyze table performance for 'users'
-Suggest indexes for 'users' table
-
-Index suggestions:
-1. CREATE INDEX idx_users_email ON users (email) - for login queries
-2. CREATE INDEX idx_users_created_at ON users (created_at) - for date range queries
-3. CREATE INDEX idx_users_status_created ON users (status, created_at) - composite index
+You: Suggest indexes for users table
+DBSage: Index suggestions:
+1. CREATE INDEX idx_users_email ON users (email);
+2. CREATE INDEX idx_users_created_at ON users (created_at);
 
 You: Optimize this slow query: SELECT * FROM orders WHERE created_at > '2024-01-01'
-DBSage: I'll analyze and optimize this query...
-
-Analyzing query performance...
-Optimizing query...
-
-Optimization suggestions:
-1. Avoid SELECT *, specify only needed columns
+DBSage: Optimization suggestions:
+1. Avoid SELECT *, specify required columns
 2. Add index on created_at column
-3. Consider partitioning if table is large
-
-Optimized query:
-SELECT id, customer_id, total, status FROM orders 
-WHERE created_at > '2024-01-01' 
-ORDER BY created_at DESC;
+3. Consider partitioning for large tables
 ```
 
-## Built-in Commands
+## Command Reference
+
+### Connection Management Commands
+- `/add <connection_name>` - Add database connection
+- `/switch <connection_name>` - Switch database connection
+- `/list` - Display all database connections
+- `/remove <connection_name>` - Remove database connection
+
+### Quick Commands
+- `@` - Display all connections
+- `@<connection_name>` - Quick switch connection
+- `@<SQL_query>` - Execute SQL query directly
 
 ### Basic Commands
-- `help` - Show feature list
-- `clear` - Clear screen and redisplay welcome message
+- `help` - Show help information
+- `clear` - Clear screen
 - `exit` / `quit` - Exit program
 
-### Query Optimization Commands
-You can ask DBSage to help you with these optimization tasks using natural language:
+## Key Features
 
-- **"Analyze the performance of this query: [SQL]"** - Get detailed performance analysis
-- **"Suggest indexes for [table_name]"** - Get AI-powered index recommendations
-- **"Show me query patterns"** - Analyze frequent and slow query patterns
-- **"Optimize this query: [SQL]"** - Get optimization suggestions
-- **"Analyze [table_name] performance"** - Deep dive into table performance issues
-- **"What are the database bottlenecks?"** - Identify system-wide performance issues
+### 🔍 Intelligent Analysis
+- Natural language to SQL conversion
+- Query performance analysis
+- Index suggestions
+- Performance bottleneck detection
 
-### Optimization Features
-- **Smart Index Detection** - Automatically identifies missing indexes on foreign keys
-- **Query Anti-pattern Detection** - Finds common performance anti-patterns
-- **Execution Plan Analysis** - Detailed analysis of EXPLAIN output
-- **Performance Scoring** - Overall database performance score (0-100)
-- **Cross-Database Support** - Works with both PostgreSQL and MySQL
+### 🛡️ Security Features
+- SQL injection detection
+- Dangerous operation confirmation
+- Parameterized query suggestions
+- Production environment protection
 
-### Slash Commands (/ Commands)
-Slash commands are used for managing database connections and application settings:
+### 🚀 Supported Databases
+- PostgreSQL
+- MySQL
+- SQLite
 
-#### Database Connection Management
-- `/add <connection_name>` - Add a new database connection
-  - Example: `/add mydb`
-  - Supports PostgreSQL and MySQL databases
-- `/switch <connection_name>` - Switch to a specific database connection
-  - Example: `/switch mydb`
-- `/list` - Display all configured database connections and their status
-- `/remove <connection_name>` - Remove a specific database connection
-  - Example: `/remove mydb`
+## Contributing & Support
 
-#### General Commands
-- `/help` - Show help information for all available commands
-- `/clear` - Clear screen and redisplay welcome message
-- `/exit` or `/quit` - Exit the application
-
-### @ Commands (Database Commands)
-@ commands are used for quick database connection selection and query execution:
-
-#### Connection Selection
-- `@` - Display list of all available database connections
-- `@<connection_name>` - Quickly switch to a specific database connection
-  - Example: `@mydb` - Switch to connection named mydb
-
-#### Database Queries
-- `@<SQL_query>` - Execute SQL queries directly (processed through AI)
-  - Example: `@show tables` - Display all tables in current database
-  - Example: `@select * from users limit 10` - Query first 10 records from users table
-
-#### Usage Examples
-```
-# View all connections
-@
-
-# Switch to production database
-@prod_db
-
-# Execute queries
-@show tables
-@SELECT COUNT(*) FROM users WHERE created_at > '2024-01-01'
-```
-
-## Security Features
-
-- **SQL Injection Protection** - Automatically detect suspicious input
-- **Dangerous Operation Alerts** - Operations like DROP, TRUNCATE require confirmation
-- **Parameterized Queries** - Recommend safe query methods
-- **Production Environment Protection** - Ask environment type before critical operations
+- **Documentation**: [https://github.com/murongg/dbsage](https://github.com/murongg/dbsage)
+- **Issue Reports**: [GitHub Issues](https://github.com/murongg/dbsage/issues)
+- **Configuration Directory**: `~/.dbsage/`

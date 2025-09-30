@@ -23,7 +23,6 @@ A PostgreSQL database AI management tool built with Go, focused on intelligent d
 
 ### Requirements
 - Go 1.21+
-- PostgreSQL database
 - OpenAI API Key
 
 ### Installation
@@ -37,7 +36,7 @@ make setup
 
 # 3. Edit configuration file
 nano .env
-# Set your OPENAI_API_KEY and DATABASE_URL
+# Set your OPENAI_API_KEY and OPENAI_BASE_URL
 
 # 4. Run the program
 make run
@@ -48,7 +47,7 @@ make run
 ```bash
 # Environment variables
 export OPENAI_API_KEY="your_openai_api_key_here"
-export DATABASE_URL="postgres://username:password@localhost:5432/database?sslmode=disable"
+export OPENAI_BASE_URL="your_openai_base_url_here"
 
 # Run directly
 go run cmd/dbsage/main.go

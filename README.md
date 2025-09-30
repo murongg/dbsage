@@ -75,9 +75,54 @@ Based on the analysis results, the following performance issues were found: ...
 
 ## Built-in Commands
 
+### Basic Commands
 - `help` - Show feature list
 - `clear` - Clear screen and redisplay welcome message
 - `exit` / `quit` - Exit program
+
+### Slash Commands (/ Commands)
+Slash commands are used for managing database connections and application settings:
+
+#### Database Connection Management
+- `/add <connection_name>` - Add a new database connection
+  - Example: `/add mydb`
+  - Supports PostgreSQL and MySQL databases
+- `/switch <connection_name>` - Switch to a specific database connection
+  - Example: `/switch mydb`
+- `/list` - Display all configured database connections and their status
+- `/remove <connection_name>` - Remove a specific database connection
+  - Example: `/remove mydb`
+
+#### General Commands
+- `/help` - Show help information for all available commands
+- `/clear` - Clear screen and redisplay welcome message
+- `/exit` or `/quit` - Exit the application
+
+### @ Commands (Database Commands)
+@ commands are used for quick database connection selection and query execution:
+
+#### Connection Selection
+- `@` - Display list of all available database connections
+- `@<connection_name>` - Quickly switch to a specific database connection
+  - Example: `@mydb` - Switch to connection named mydb
+
+#### Database Queries
+- `@<SQL_query>` - Execute SQL queries directly (processed through AI)
+  - Example: `@show tables` - Display all tables in current database
+  - Example: `@select * from users limit 10` - Query first 10 records from users table
+
+#### Usage Examples
+```
+# View all connections
+@
+
+# Switch to production database
+@prod_db
+
+# Execute queries
+@show tables
+@SELECT COUNT(*) FROM users WHERE created_at > '2024-01-01'
+```
 
 ## Security Features
 

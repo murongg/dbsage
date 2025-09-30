@@ -3,6 +3,9 @@ package utils
 import (
 	"strings"
 	"unicode"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 // TruncateString truncates a string to a maximum length
@@ -25,7 +28,8 @@ func IsEmpty(s string) bool {
 
 // ToTitle converts a string to title case
 func ToTitle(s string) string {
-	return strings.Title(strings.ToLower(s))
+	caser := cases.Title(language.English)
+	return caser.String(strings.ToLower(s))
 }
 
 // IsValidIdentifier checks if a string is a valid SQL identifier

@@ -3,6 +3,7 @@ package database
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -38,7 +39,11 @@ func NewConnectionManager() dbinterfaces.ConnectionManagerInterface {
 	}
 
 	// Load existing connections
-	cm.loadConnections()
+	if err := cm.loadConnections(); err != nil {
+		// Log error but don't fail initialization
+		// This allows the manager to work even if the config file is corrupted
+		log.Printf("Warning: failed to load connections: %v", err)
+	}
 	return cm
 }
 
@@ -170,7 +175,9 @@ func (cm *ConnectionManager) SwitchConnection(name string) error {
 	if config, exists := cm.configs[name]; exists {
 		config.LastUsed = time.Now().Format(time.RFC3339)
 		// Save the updated configuration
-		cm.saveConnections()
+		if err := cm.saveConnections(); err != nil {
+			log.Printf("Warning: failed to save connections after switching: %v", err)
+		}
 	}
 
 	return nil

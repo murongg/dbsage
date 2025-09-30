@@ -217,7 +217,9 @@ func (o *PostgreSQLQueryOptimizer) analyzeSpecificQuery(query string) ([]models.
 	// This is a simplified version - in a real implementation, you'd parse the JSON
 	if rows.Next() {
 		var explainOutput string
-		rows.Scan(&explainOutput)
+		if err := rows.Scan(&explainOutput); err != nil {
+			return suggestions, fmt.Errorf("failed to scan EXPLAIN output: %w", err)
+		}
 
 		if strings.Contains(explainOutput, "Seq Scan") {
 			suggestions = append(suggestions, models.QueryOptimizationSuggestion{

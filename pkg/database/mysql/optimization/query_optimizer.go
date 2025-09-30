@@ -216,7 +216,9 @@ func (o *MySQLQueryOptimizer) analyzeSpecificQuery(query string) ([]models.Query
 	// Parse EXPLAIN output and generate suggestions
 	if rows.Next() {
 		var explainOutput string
-		rows.Scan(&explainOutput)
+		if err := rows.Scan(&explainOutput); err != nil {
+			return suggestions, fmt.Errorf("failed to scan EXPLAIN output: %w", err)
+		}
 
 		if strings.Contains(explainOutput, "ALL") {
 			suggestions = append(suggestions, models.QueryOptimizationSuggestion{

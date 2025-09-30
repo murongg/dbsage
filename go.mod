@@ -1,6 +1,6 @@
 module dbsage
 
-go 1.23.0
+go 1.24.0
 
 toolchain go1.24.7
 
@@ -12,6 +12,7 @@ require (
 	github.com/go-sql-driver/mysql v1.9.3
 	github.com/lib/pq v1.10.9
 	github.com/sashabaranov/go-openai v1.20.4
+	golang.org/x/text v0.29.0
 )
 
 require (
@@ -43,8 +44,7 @@ require (
 	github.com/yuin/goldmark v1.7.8 // indirect
 	github.com/yuin/goldmark-emoji v1.0.5 // indirect
 	golang.org/x/net v0.33.0 // indirect
-	golang.org/x/sync v0.13.0 // indirect
+	golang.org/x/sync v0.17.0 // indirect
 	golang.org/x/sys v0.32.0 // indirect
 	golang.org/x/term v0.31.0 // indirect
-	golang.org/x/text v0.24.0 // indirect
 )

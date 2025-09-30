@@ -6,6 +6,7 @@ import (
 
 	"dbsage/pkg/database/mysql"
 	"dbsage/pkg/database/postgresql"
+	"dbsage/pkg/database/sqlite"
 	"dbsage/pkg/dbinterfaces"
 )
 
@@ -33,9 +34,9 @@ func NewProviderManager() *ProviderManager {
 	// Register built-in providers
 	pm.RegisterProvider(PostgreSQL, postgresql.NewPostgreSQLProvider())
 	pm.RegisterProvider(MySQL, mysql.NewMySQLProvider())
+	pm.RegisterProvider(SQLite, sqlite.NewSQLiteProvider())
 
 	// TODO: Add other providers when implemented
-	// pm.RegisterProvider(SQLite, sqlite.NewSQLiteProvider())
 	// pm.RegisterProvider(MongoDB, mongodb.NewMongoDBProvider())
 
 	return pm

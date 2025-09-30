@@ -42,7 +42,7 @@ func (f *ProviderFactory) DetectDatabaseType(config *dbinterfaces.ConnectionConf
 
 // GetSupportedTypes returns a list of supported database types
 func (f *ProviderFactory) GetSupportedTypes() []DatabaseType {
-	return []DatabaseType{PostgreSQL}
+	return []DatabaseType{PostgreSQL, MySQL, SQLite}
 }
 
 // NewDefaultConnectionService will be implemented in a separate file to avoid import cycles

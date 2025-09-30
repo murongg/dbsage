@@ -30,12 +30,14 @@ if [ ! -f ".env" ]; then
     else
         echo "📄 Creating .env file with default template..."
         cat > .env << 'EOF'
-# OpenAI Configuration
+# OpenAI Configuration (Required for AI features)
+# Get your API key from: https://platform.openai.com/api-keys
 OPENAI_API_KEY=your_openai_api_key_here
 OPENAI_BASE_URL=https://api.openai.com/v1
 
-# Database Configuration
-DATABASE_URL=postgres://username:password@localhost:5432/database?sslmode=disable
+# Database Configuration (Optional - can be set up through the app)
+# Note: You can add database connections using '/add <name>' command in the app
+# DATABASE_URL=postgres://username:password@localhost:5432/database?sslmode=disable
 
 # Optional: Application Configuration
 # LOG_LEVEL=info
@@ -66,13 +68,23 @@ chmod +x scripts/setup.sh
 echo ""
 echo "🎉 Setup completed successfully!"
 echo ""
-echo "Next steps:"
-echo "1. Edit the .env file with your actual credentials:"
-echo "   - Set your OPENAI_API_KEY"
-echo "   - Set your DATABASE_URL"
+echo "🚀 Quick Start Guide:"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
-echo "2. Run the application:"
-echo "   make run    # or"
-echo "   make dev    # for development mode"
+echo "1. 🔑 Get your OpenAI API key:"
+echo "   → Visit: https://platform.openai.com/api-keys"
+echo "   → Edit .env file and set: OPENAI_API_KEY=your_actual_key"
 echo ""
-echo "For help, run: make help"
+echo "2. 🏃 Run DBSage:"
+echo "   → ./scripts/run.sh    # or make run"
+echo ""
+echo "3. 📚 First time usage:"
+echo "   → The app will show setup guidance automatically"
+echo "   → Use '/add mydb' to add database connections"
+echo "   → Press 'q' to dismiss guidance messages"
+echo "   → Type '?' for help anytime"
+echo ""
+echo "💡 Pro tip: You can start DBSage even without API key or database!"
+echo "   The app will guide you through the setup process."
+echo ""
+echo "For advanced options, run: make help"

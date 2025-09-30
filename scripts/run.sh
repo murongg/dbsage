@@ -7,28 +7,36 @@ echo "🚀 Starting Database AI Assistant (Go Version)..."
 # Try to load .env file if it exists
 if [ -f ".env" ]; then
     echo "📄 Loading environment variables from .env file..."
-    export $(cat .env | grep -v '^#' | grep -v '^$' | xargs)
+    set -a; source .env; set +a
 fi
 
-# Check if environment variables are set
+# Check configuration status and provide helpful information
+config_warnings=0
+
 if [ -z "$OPENAI_API_KEY" ]; then
-    echo "❌ Error: OPENAI_API_KEY environment variable is not set"
-    echo ""
-    echo "Please either:"
-    echo "1. Set it with: export OPENAI_API_KEY=\"your_api_key_here\""
-    echo "2. Create a .env file with: OPENAI_API_KEY=your_api_key_here"
-    echo "3. Copy configs/config.example to .env and edit it"
-    exit 1
+    echo "⚠️  Warning: OPENAI_API_KEY not set - AI features will be disabled"
+    echo "   You can still use database commands (/add, /list, /switch)"
+    echo "   To enable AI: export OPENAI_API_KEY=\"your_api_key_here\""
+    config_warnings=$((config_warnings + 1))
 fi
 
-if [ -z "$DATABASE_URL" ]; then
-    echo "❌ Error: DATABASE_URL environment variable is not set"
+# Check if there's a base URL override
+if [ -n "$OPENAI_BASE_URL" ]; then
+    echo "🔗 Using custom OpenAI base URL: $OPENAI_BASE_URL"
+fi
+
+# Note: DATABASE_URL is no longer required as connections are managed through the app
+if [ -z "$DATABASE_URL" ] && [ $config_warnings -eq 0 ]; then
+    echo "💡 Tip: Add database connections using '/add <name>' command in the app"
+fi
+
+if [ $config_warnings -gt 0 ]; then
     echo ""
-    echo "Please either:"
-    echo "1. Set it with: export DATABASE_URL=\"postgres://user:pass@localhost:5432/db?sslmode=disable\""
-    echo "2. Create a .env file with the DATABASE_URL"
-    echo "3. Copy configs/config.example to .env and edit it"
-    exit 1
+    echo "📋 Quick setup guide:"
+    echo "   1. Create .env file with: OPENAI_API_KEY=your_api_key_here"
+    echo "   2. Start DBSage and use '/add mydb' to add database connections"
+    echo "   3. Follow the in-app guidance for complete setup"
+    echo ""
 fi
 
 # Install dependencies if go.mod exists
@@ -44,6 +52,14 @@ go build -o dbsage ./cmd/dbsage/main.go
 
 if [ $? -eq 0 ]; then
     echo "✅ Build successful! Starting application..."
+    echo ""
+    echo "📱 DBSage is starting..."
+    if [ -z "$OPENAI_API_KEY" ]; then
+        echo "   → You'll see guidance on setting up your API key"
+    fi
+    echo "   → Press 'q' to dismiss guidance messages"
+    echo "   → Type '?' or '/help' for available commands"
+    echo "   → Press Ctrl+C to exit"
     echo ""
     ./dbsage
 else

@@ -1,6 +1,6 @@
 # Database AI Assistant - Go Version Makefile
 
-.PHONY: help setup build run clean install dev test release release-patch release-minor release-major
+.PHONY: help setup build run clean install dev test lint check fmt release release-patch release-minor release-major
 
 # Default target
 help:
@@ -12,7 +12,14 @@ help:
 	@echo "  build     - 🔨 Build the application"
 	@echo "  run       - 🚀 Run the application"
 	@echo "  dev       - 💻 Run in development mode (go run)"
+	@echo ""
+	@echo "Code quality:"
+	@echo "  lint      - 🔍 Run code quality checks"
+	@echo "  fmt       - 📝 Format code"
+	@echo "  check     - 🎯 Run lint + tests"
 	@echo "  test      - 🧪 Run tests"
+	@echo ""
+	@echo "Maintenance:"
 	@echo "  install   - 📦 Install/update dependencies"
 	@echo "  clean     - 🧹 Clean build artifacts"
 	@echo ""
@@ -56,6 +63,29 @@ clean:
 	@rm -f dbsage
 	@go clean
 	@echo "✅ Clean complete!"
+
+# Run linting and code quality checks
+lint:
+	@echo "🔍 Running code quality checks..."
+	@echo "  📝 Checking code format..."
+	@if [ -n "$$(gofmt -l .)" ]; then echo "❌ Code formatting issues found. Run 'make fmt' to fix."; gofmt -l .; exit 1; else echo "✅ Code format OK"; fi
+	@echo "  🔍 Running go vet..."
+	@go vet ./... && echo "✅ go vet passed" || (echo "❌ go vet failed" && exit 1)
+	@echo "  🔨 Checking compilation..."
+	@go build ./... && echo "✅ Build successful" || (echo "❌ Build failed" && exit 1)
+	@echo "  📋 Checking imports..."
+	@go mod tidy && echo "✅ Imports clean" || (echo "❌ Import issues" && exit 1)
+	@echo "✅ All lint checks completed!"
+
+# Comprehensive check including tests
+check: lint test
+	@echo "🎯 All checks passed!"
+
+# Format code
+fmt:
+	@echo "📝 Formatting code..."
+	@gofmt -w .
+	@echo "✅ Code formatted!"
 
 # Run tests
 test:

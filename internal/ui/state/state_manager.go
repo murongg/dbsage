@@ -1,6 +1,8 @@
 package state
 
 import (
+	"strings"
+
 	"dbsage/internal/ai"
 	"dbsage/internal/models"
 	"dbsage/internal/ui/handlers"
@@ -29,6 +31,9 @@ type StateManager struct {
 	pendingToolConfirmation *models.ToolConfirmationInfo
 	toolConfirmationConfig  *models.ToolConfirmationConfig
 	pendingAIContext        *models.PendingAIContext // Store AI context for resuming after confirmation
+	// Guidance fields
+	currentGuidance *models.GuidanceInfo
+	hasApiKey       bool
 }
 
 // NewStateManager creates a new state manager
@@ -40,7 +45,9 @@ func NewStateManager(aiClient *ai.Client, dbTools dbinterfaces.DatabaseInterface
 
 	cmdHandler := handlers.NewCommandHandler(connService)
 
-	return &StateManager{
+	hasApiKey := aiClient != nil
+
+	sm := &StateManager{
 		aiClient:               aiClient,
 		dbTools:                dbTools,
 		connMgr:                connMgr,
@@ -48,7 +55,13 @@ func NewStateManager(aiClient *ai.Client, dbTools dbinterfaces.DatabaseInterface
 		currentState:           models.StateInput,
 		history:                make([]openai.ChatCompletionMessage, 0),
 		toolConfirmationConfig: GetDefaultToolConfirmationConfig(),
+		hasApiKey:              hasApiKey,
 	}
+
+	// Check if we need to show guidance
+	sm.checkAndSetInitialGuidance()
+
+	return sm
 }
 
 // State getters and setters
@@ -212,6 +225,20 @@ func (sm *StateManager) ProcessInput(input string) (bool, string) {
 		sm.SetResponse(response)
 		sm.SetError(nil)
 		sm.SetState(models.StateResponse)
+
+		// Check if command may have affected database connections and refresh guidance
+		if strings.HasPrefix(input, "/add") || strings.HasPrefix(input, "/switch") || strings.HasPrefix(input, "/remove") {
+			// Get updated database tools from connection service
+			if sm.connMgr != nil {
+				if connService, ok := sm.connMgr.(interface {
+					GetCurrentTools() dbinterfaces.DatabaseInterface
+				}); ok {
+					updatedTools := connService.GetCurrentTools()
+					sm.UpdateDatabaseTools(updatedTools)
+				}
+			}
+		}
+
 		return true, ""
 	}
 
@@ -227,4 +254,92 @@ func (sm *StateManager) UpdateCommandSuggestions(input string) {
 	suggestions := sm.cmdHandler.GetCommandSuggestions(input)
 	sm.SetCommandSuggestions(suggestions)
 	sm.SetShowSuggestions(len(suggestions) > 0)
+}
+
+// Guidance management
+func (sm *StateManager) GetCurrentGuidance() *models.GuidanceInfo {
+	return sm.currentGuidance
+}
+
+func (sm *StateManager) SetCurrentGuidance(guidance *models.GuidanceInfo) {
+	sm.currentGuidance = guidance
+}
+
+func (sm *StateManager) HasApiKey() bool {
+	return sm.hasApiKey
+}
+
+func (sm *StateManager) checkAndSetInitialGuidance() {
+	if !sm.hasApiKey {
+		sm.currentGuidance = &models.GuidanceInfo{
+			Type:    "api_key_missing",
+			Title:   "🔑 API Key Required",
+			Message: "To use DBSage AI features, you need to configure your OpenAI API key.",
+			Instructions: []string{
+				"1. Get your API key from OpenAI (https://platform.openai.com/api-keys)",
+				"2. Set the environment variable: 'export OPENAI_API_KEY=your_api_key_here'",
+				"3. Optionally set: 'export OPENAI_BASE_URL=https://api.openai.com/v1'",
+				"4. Restart DBSage to use AI features",
+			},
+			Actions: []string{
+				"You can still use database commands like '/add', '/list', '/switch' without API key",
+				"Press 'q' to dismiss this message",
+			},
+		}
+		return
+	}
+
+	if sm.dbTools == nil {
+		sm.currentGuidance = &models.GuidanceInfo{
+			Type:    "no_database",
+			Title:   "🗄️ No Database Connected",
+			Message: "Welcome to DBSage! You need to connect to a database to get started.",
+			Instructions: []string{
+				"1. Use '/add' <name> to add a new database connection",
+				"2. Follow the prompts to enter connection details",
+				"3. Use '/switch' <name> to switch between databases",
+				"4. Type '/help' for more commands",
+			},
+			Actions: []string{
+				"Example: '/add' mydb",
+				"Press 'q' to dismiss this message",
+			},
+		}
+		return
+	}
+
+	// Check if this is first time use (no history)
+	if len(sm.history) == 0 {
+		sm.currentGuidance = &models.GuidanceInfo{
+			Type:    "first_time",
+			Title:   "👋 Welcome to DBSage!",
+			Message: "Your AI-powered database assistant is ready to help.",
+			Instructions: []string{
+				"• Ask questions in natural language: \"Show me all users\"",
+				"• Use commands: '/help', '/list', '/add', '/switch'",
+				"• Get table information: \"What tables do I have?\"",
+				"• Analyze data: \"Find the top 10 customers by revenue\"",
+				"• Optimize queries: \"How can I improve this query?\"",
+			},
+			Actions: []string{
+				"Try asking: \"What tables are in my database?\"",
+				"Press 'q' to dismiss this message",
+			},
+		}
+	}
+}
+
+func (sm *StateManager) DismissGuidance() {
+	sm.currentGuidance = nil
+}
+
+func (sm *StateManager) UpdateDatabaseTools(dbTools dbinterfaces.DatabaseInterface) {
+	sm.dbTools = dbTools
+	// Re-check guidance after database tools update
+	sm.checkAndSetInitialGuidance()
+}
+
+func (sm *StateManager) RefreshGuidance() {
+	// Re-check guidance state (useful after connection changes)
+	sm.checkAndSetInitialGuidance()
 }

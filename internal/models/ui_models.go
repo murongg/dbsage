@@ -16,6 +16,7 @@ const (
 	StateResponse
 	StateHelp
 	StateToolConfirmation
+	StateGuidance
 )
 
 // ToolConfirmationInfo contains information about a tool that needs confirmation
@@ -86,4 +87,18 @@ type ToolConfirmationMsg struct {
 type ToolConfirmationResponseMsg struct {
 	Confirmed bool
 	Action    string // "execute", "cancel", "edit"
+}
+
+// GuidanceInfo contains information about user guidance
+type GuidanceInfo struct {
+	Type         string   `json:"type"` // "first_time", "api_key_missing", "no_database"
+	Title        string   `json:"title"`
+	Message      string   `json:"message"`
+	Instructions []string `json:"instructions"`
+	Actions      []string `json:"actions"`
+}
+
+// GuidanceMsg is sent to show guidance to the user
+type GuidanceMsg struct {
+	GuidanceInfo *GuidanceInfo
 }

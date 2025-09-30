@@ -13,10 +13,6 @@ import (
 func main() {
 	// Get environment variables
 	apiKey := os.Getenv("OPENAI_API_KEY")
-	if apiKey == "" {
-		log.Fatal("OPENAI_API_KEY environment variable is required")
-	}
-
 	baseURL := os.Getenv("OPENAI_BASE_URL")
 	if baseURL == "" {
 		baseURL = "https://api.openai.com/v1"
@@ -29,17 +25,15 @@ func main() {
 	// Get current database tools
 	dbTools := connService.GetCurrentTools()
 
-	if dbTools == nil {
-		log.Println("No database connections available.")
-		log.Println("Use '/add <name>' command to add database connections.")
+	var openaiClient *ai.Client
+	if apiKey != "" {
+		// Initialize OpenAI client with dynamic database tools
+		openaiClient = ai.NewClientWithDynamicTools(apiKey, baseURL, func() dbinterfaces.DatabaseInterface {
+			return connService.GetCurrentTools()
+		})
 	}
 
-	// Initialize OpenAI client with dynamic database tools
-	openaiClient := ai.NewClientWithDynamicTools(apiKey, baseURL, func() dbinterfaces.DatabaseInterface {
-		return connService.GetCurrentTools()
-	})
-
-	// Run Bubble Tea TUI
+	// Run Bubble Tea TUI - it will handle the case when apiKey is empty
 	if err := ui.Run(openaiClient, dbTools, connService); err != nil {
 		log.Fatalf("TUI error: %v", err)
 	}

@@ -131,9 +131,17 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *Model) View() string {
 	var contentSections []string
 
-	// Fixed welcome message box
-	welcomeBox := m.contentRenderer.RenderWelcomeBox()
+	// Fixed welcome message box with status
+	hasApiKey := m.stateManager.HasApiKey()
+	hasDatabase := m.stateManager.GetDatabaseTools() != nil
+	welcomeBox := m.contentRenderer.RenderWelcomeBoxWithStatus(hasApiKey, hasDatabase)
 	contentSections = append(contentSections, welcomeBox)
+
+	// Guidance information (if needed)
+	if guidance := m.stateManager.GetCurrentGuidance(); guidance != nil {
+		guidanceContent := m.contentRenderer.RenderGuidance(guidance)
+		contentSections = append(contentSections, guidanceContent)
+	}
 
 	// Help information (if needed)
 	if m.stateManager.IsShowHelp() {

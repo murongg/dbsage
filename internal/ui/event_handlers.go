@@ -55,6 +55,14 @@ func (m *Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.stateManager.SetShowHelp(showHelp)
 		return m, nil
 
+	case "q":
+		// Dismiss guidance if it's currently shown
+		if m.stateManager.GetCurrentGuidance() != nil {
+			m.stateManager.DismissGuidance()
+			return m, nil
+		}
+		return m, nil
+
 	case "tab":
 		if m.stateManager.GetState() == models.StateInput {
 			return m.handleTabCompletion()

@@ -19,6 +19,14 @@ A PostgreSQL database AI management tool built with Go, focused on intelligent d
 - **Index Management** - View and analyze table indexes
 - **Data Statistics** - Get table statistics and data analysis
 
+### Advanced Query Optimization
+- **Query Performance Analysis** - Comprehensive analysis of query execution plans
+- **Index Suggestions** - AI-powered recommendations for optimal indexing
+- **Query Pattern Analysis** - Identify and optimize frequent query patterns
+- **Query Optimization** - Automated suggestions for query improvements
+- **Table Performance Analysis** - Deep dive into table-specific performance issues
+- **Bottleneck Detection** - Identify and resolve database performance bottlenecks
+
 ## Quick Start
 
 ### Requirements
@@ -71,6 +79,33 @@ Get all table sizes
 Get active connection information
 
 Based on the analysis results, the following performance issues were found: ...
+
+You: Suggest indexes for my users table
+DBSage: I'll analyze the users table and suggest optimal indexes...
+
+Analyze table performance for 'users'
+Suggest indexes for 'users' table
+
+Index suggestions:
+1. CREATE INDEX idx_users_email ON users (email) - for login queries
+2. CREATE INDEX idx_users_created_at ON users (created_at) - for date range queries
+3. CREATE INDEX idx_users_status_created ON users (status, created_at) - composite index
+
+You: Optimize this slow query: SELECT * FROM orders WHERE created_at > '2024-01-01'
+DBSage: I'll analyze and optimize this query...
+
+Analyzing query performance...
+Optimizing query...
+
+Optimization suggestions:
+1. Avoid SELECT *, specify only needed columns
+2. Add index on created_at column
+3. Consider partitioning if table is large
+
+Optimized query:
+SELECT id, customer_id, total, status FROM orders 
+WHERE created_at > '2024-01-01' 
+ORDER BY created_at DESC;
 ```
 
 ## Built-in Commands
@@ -79,6 +114,23 @@ Based on the analysis results, the following performance issues were found: ...
 - `help` - Show feature list
 - `clear` - Clear screen and redisplay welcome message
 - `exit` / `quit` - Exit program
+
+### Query Optimization Commands
+You can ask DBSage to help you with these optimization tasks using natural language:
+
+- **"Analyze the performance of this query: [SQL]"** - Get detailed performance analysis
+- **"Suggest indexes for [table_name]"** - Get AI-powered index recommendations
+- **"Show me query patterns"** - Analyze frequent and slow query patterns
+- **"Optimize this query: [SQL]"** - Get optimization suggestions
+- **"Analyze [table_name] performance"** - Deep dive into table performance issues
+- **"What are the database bottlenecks?"** - Identify system-wide performance issues
+
+### Optimization Features
+- **Smart Index Detection** - Automatically identifies missing indexes on foreign keys
+- **Query Anti-pattern Detection** - Finds common performance anti-patterns
+- **Execution Plan Analysis** - Detailed analysis of EXPLAIN output
+- **Performance Scoring** - Overall database performance score (0-100)
+- **Cross-Database Support** - Works with both PostgreSQL and MySQL
 
 ### Slash Commands (/ Commands)
 Slash commands are used for managing database connections and application settings:

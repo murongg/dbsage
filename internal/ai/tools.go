@@ -174,5 +174,85 @@ func GetTools() []openai.Tool {
 				},
 			},
 		},
+		{
+			Type: openai.ToolTypeFunction,
+			Function: &openai.FunctionDefinition{
+				Name:        "analyze_query_performance",
+				Description: "Analyze the performance of a specific query and provide optimization suggestions",
+				Parameters: map[string]interface{}{
+					"type": "object",
+					"properties": map[string]interface{}{
+						"query": map[string]interface{}{
+							"type":        "string",
+							"description": "The SQL query to analyze",
+						},
+					},
+					"required": []string{"query"},
+				},
+			},
+		},
+		{
+			Type: openai.ToolTypeFunction,
+			Function: &openai.FunctionDefinition{
+				Name:        "suggest_indexes",
+				Description: "Suggest indexes for a specific table to improve performance",
+				Parameters: map[string]interface{}{
+					"type": "object",
+					"properties": map[string]interface{}{
+						"tableName": map[string]interface{}{
+							"type":        "string",
+							"description": "The name of the table to analyze for index suggestions",
+						},
+					},
+					"required": []string{"tableName"},
+				},
+			},
+		},
+		{
+			Type: openai.ToolTypeFunction,
+			Function: &openai.FunctionDefinition{
+				Name:        "get_query_patterns",
+				Description: "Analyze query patterns from database statistics to identify optimization opportunities",
+				Parameters: map[string]interface{}{
+					"type":       "object",
+					"properties": map[string]interface{}{},
+					"required":   []string{},
+				},
+			},
+		},
+		{
+			Type: openai.ToolTypeFunction,
+			Function: &openai.FunctionDefinition{
+				Name:        "optimize_query",
+				Description: "Provide optimization suggestions for a specific query",
+				Parameters: map[string]interface{}{
+					"type": "object",
+					"properties": map[string]interface{}{
+						"query": map[string]interface{}{
+							"type":        "string",
+							"description": "The SQL query to optimize",
+						},
+					},
+					"required": []string{"query"},
+				},
+			},
+		},
+		{
+			Type: openai.ToolTypeFunction,
+			Function: &openai.FunctionDefinition{
+				Name:        "analyze_table_performance",
+				Description: "Analyze performance issues specific to a table",
+				Parameters: map[string]interface{}{
+					"type": "object",
+					"properties": map[string]interface{}{
+						"tableName": map[string]interface{}{
+							"type":        "string",
+							"description": "The name of the table to analyze",
+						},
+					},
+					"required": []string{"tableName"},
+				},
+			},
+		},
 	}
 }

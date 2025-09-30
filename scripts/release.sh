@@ -35,9 +35,6 @@ TAG="🏷️"
 
 # Configuration
 REPO_NAME="murongg/dbsage"
-BINARY_NAME="dbsage"
-BUILD_DIR="dist"
-ARCHIVE_DIR="release"
 
 # Print functions
 print_success() {
@@ -193,12 +190,10 @@ check_dependencies() {
     
     local missing_deps=()
     
-    # Check required tools
-    for tool in go git tar zip; do
-        if ! command -v "$tool" >/dev/null 2>&1; then
-            missing_deps+=("$tool")
-        fi
-    done
+    # Check required tools (only git needed for tagging)
+    if ! command -v git >/dev/null 2>&1; then
+        missing_deps+=("git")
+    fi
     
     if [ ${#missing_deps[@]} -gt 0 ]; then
         print_error "Missing dependencies: ${missing_deps[*]}"
@@ -208,104 +203,6 @@ check_dependencies() {
     print_success "All dependencies available"
 }
 
-# Build binaries for all platforms
-build_binaries() {
-    print_info "Building binaries for all platforms..."
-    
-    # Clean and create build directory
-    rm -rf "$BUILD_DIR"
-    mkdir -p "$BUILD_DIR"
-    
-    # Build matrix
-    local platforms=(
-        "linux:amd64"
-        "linux:arm64"
-        "darwin:amd64"
-        "darwin:arm64"
-        "windows:amd64"
-        "windows:arm64"
-    )
-    
-    for platform in "${platforms[@]}"; do
-        local goos=${platform%:*}
-        local goarch=${platform#*:}
-        local binary_name="$BINARY_NAME"
-        
-        if [ "$goos" = "windows" ]; then
-            binary_name="${binary_name}.exe"
-        fi
-        
-        print_info "Building ${goos}/${goarch}..."
-        
-        env GOOS="$goos" GOARCH="$goarch" CGO_ENABLED=0 \
-            go build -ldflags="-w -s -X main.Version=${NEW_VERSION}" \
-            -o "${BUILD_DIR}/${binary_name}" \
-            ./cmd/dbsage/main.go
-        
-        if [ $? -ne 0 ]; then
-            print_error "Failed to build for ${goos}/${goarch}"
-            exit 1
-        fi
-        
-        # Move binary to platform-specific directory
-        local platform_dir="${BUILD_DIR}/${goos}_${goarch}"
-        mkdir -p "$platform_dir"
-        mv "${BUILD_DIR}/${binary_name}" "$platform_dir/"
-        
-        print_success "Built ${goos}/${goarch}"
-    done
-    
-    print_success "All binaries built successfully"
-}
-
-# Create release archives
-create_archives() {
-    print_info "Creating release archives..."
-    
-    # Clean and create archive directory
-    rm -rf "$ARCHIVE_DIR"
-    mkdir -p "$ARCHIVE_DIR"
-    
-    # Create archives for each platform
-    for platform_dir in "$BUILD_DIR"/*; do
-        if [ ! -d "$platform_dir" ]; then
-            continue
-        fi
-        
-        local platform=$(basename "$platform_dir")
-        local archive_name
-        
-        print_info "Creating archive for $platform..."
-        
-        # Copy additional files
-        cp README.md "$platform_dir/" 2>/dev/null || true
-        cp LICENSE "$platform_dir/" 2>/dev/null || true
-        
-        # Create archive
-        if [[ "$platform" == windows_* ]]; then
-            archive_name="dbsage_${platform}.zip"
-            (cd "$platform_dir" && zip -q "../$ARCHIVE_DIR/$archive_name" *)
-        else
-            archive_name="dbsage_${platform}.tar.gz"
-            tar -czf "$ARCHIVE_DIR/$archive_name" -C "$platform_dir" .
-        fi
-        
-        print_success "Created $archive_name"
-    done
-    
-    print_success "All archives created"
-}
-
-# Generate checksums
-generate_checksums() {
-    print_info "Generating checksums..."
-    
-    cd "$ARCHIVE_DIR"
-    sha256sum * > checksums.txt
-    cd - > /dev/null
-    
-    print_success "Checksums generated"
-}
 
 # Create git tag
 create_git_tag() {
@@ -349,24 +246,29 @@ push_to_remote() {
 # Show release summary
 show_summary() {
     echo ""
-    print_success "🎉 Release $NEW_VERSION completed!"
+    print_success "🎉 Release $NEW_VERSION initiated!"
     echo ""
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${YELLOW}${PACKAGE} Release Summary:${NC}"
     echo ""
     echo "• ${BLUE}Version:${NC} $NEW_VERSION"
-    echo "• ${BLUE}Tag:${NC} $NEW_VERSION"
-    echo "• ${BLUE}Archives:${NC} $(ls $ARCHIVE_DIR/*.tar.gz $ARCHIVE_DIR/*.zip 2>/dev/null | wc -l) files"
-    echo "• ${BLUE}Checksums:${NC} $ARCHIVE_DIR/checksums.txt"
+    echo "• ${BLUE}Git Tag:${NC} $NEW_VERSION"
+    echo "• ${BLUE}Repository:${NC} https://github.com/$REPO_NAME"
     echo ""
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${YELLOW}${INFO} Next Steps:${NC}"
+    echo -e "${YELLOW}${INFO} What happens next:${NC}"
     echo ""
-    echo "1. ${BLUE}GitHub Release:${NC} Visit https://github.com/$REPO_NAME/releases"
-    echo "2. ${BLUE}Upload Assets:${NC} Upload files from $ARCHIVE_DIR/ directory"
-    echo "3. ${BLUE}Release Notes:${NC} Add release notes and changelog"
+    echo "1. ${BLUE}GitHub Action Triggered:${NC} The tag push will trigger the release workflow"
+    echo "2. ${BLUE}Multi-platform Build:${NC} Builds for Linux, macOS, Windows (AMD64/ARM64)"
+    echo "3. ${BLUE}Archive Creation:${NC} Creates .tar.gz and .zip archives"
+    echo "4. ${BLUE}GitHub Release:${NC} Automatically creates release with all assets"
+    echo "5. ${BLUE}Installation Ready:${NC} Users can install via the install scripts"
     echo ""
-    echo -e "${GREEN}The GitHub Action should automatically create the release!${NC}"
+    echo -e "${GREEN}🚀 Monitor the GitHub Action at: https://github.com/$REPO_NAME/actions${NC}"
+    echo ""
+    echo -e "${YELLOW}Installation commands for users:${NC}"
+    echo "• ${CYAN}Linux/macOS:${NC} curl -fsSL https://raw.githubusercontent.com/$REPO_NAME/main/install.sh | bash"
+    echo "• ${CYAN}Windows:${NC} Download and run install.bat"
     echo ""
 }
 
@@ -447,15 +349,6 @@ main() {
             exit 0
         fi
         echo ""
-    fi
-    
-    # Build and package
-    if [ "$DRY_RUN" != "true" ]; then
-        build_binaries
-        create_archives
-        generate_checksums
-    else
-        print_info "[DRY RUN] Would build binaries and create archives"
     fi
     
     # Git operations

@@ -24,28 +24,21 @@ The easiest way to create a release is using the automated release script:
 
 1. **Validation**
    - Checks git status (clean working directory)
-   - Validates dependencies (go, git, tar, zip)
+   - Validates dependencies (git)
    - Confirms target version
 
-2. **Building**
-   - Builds binaries for all supported platforms:
-     - Linux (AMD64, ARM64)
-     - macOS (AMD64, ARM64) 
-     - Windows (AMD64, ARM64)
-
-3. **Packaging**
-   - Creates `.tar.gz` archives for Unix platforms
-   - Creates `.zip` archives for Windows
-   - Generates SHA256 checksums
-
-4. **Git Operations**
+2. **Git Operations**
    - Creates annotated git tag
    - Pushes tag to remote repository
 
-5. **GitHub Integration**
+3. **GitHub Integration**
    - Tag push triggers GitHub Action
-   - Action automatically creates GitHub Release
-   - Uploads all build artifacts
+   - Action automatically:
+     - Builds binaries for all platforms (Linux, macOS, Windows)
+     - Creates archives (.tar.gz for Unix, .zip for Windows)
+     - Generates SHA256 checksums
+     - Creates GitHub Release
+     - Uploads all build artifacts
 
 ## Manual Release Process
 
@@ -64,24 +57,7 @@ git pull origin main
 go test ./...
 ```
 
-### 2. Build Binaries
-
-```bash
-# Build for all platforms
-make build-all
-
-# Or use the build script
-./scripts/build.sh
-```
-
-### 3. Create Archives
-
-```bash
-# Package releases
-./scripts/package.sh v1.2.3
-```
-
-### 4. Create Git Tag
+### 2. Create Git Tag
 
 ```bash
 # Create and push tag
@@ -89,7 +65,7 @@ git tag -a v1.2.3 -m "Release v1.2.3"
 git push origin v1.2.3
 ```
 
-### 5. Create GitHub Release
+### 3. Monitor GitHub Action
 
 The GitHub Action will automatically:
 - Create a GitHub Release

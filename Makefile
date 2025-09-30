@@ -1,6 +1,6 @@
 # Database AI Assistant - Go Version Makefile
 
-.PHONY: help setup build run clean install dev test lint check fmt release release-patch release-minor release-major
+.PHONY: help setup build run clean install dev test test-coverage test-race test-utils test-models test-database test-ai test-ui benchmark benchmark-utils benchmark-ai benchmark-ui lint check fmt release release-patch release-minor release-major
 
 # Default target
 help:
@@ -17,7 +17,20 @@ help:
 	@echo "  lint      - 🔍 Run code quality checks"
 	@echo "  fmt       - 📝 Format code"
 	@echo "  check     - 🎯 Run lint + tests"
-	@echo "  test      - 🧪 Run tests"
+	@echo ""
+	@echo "Testing:"
+	@echo "  test           - 🧪 Run all tests"
+	@echo "  test-coverage  - 📊 Run tests with coverage report"
+	@echo "  test-race      - 🏃 Run tests with race detection"
+	@echo "  test-utils     - 🧪 Run utils tests only"
+	@echo "  test-models    - 🧪 Run models tests only"
+	@echo "  test-database  - 🧪 Run database tests only"
+	@echo "  test-ai        - 🧪 Run AI tests only"
+	@echo "  test-ui        - 🧪 Run UI tests only"
+	@echo ""
+	@echo "Benchmarking:"
+	@echo "  benchmark      - 🚀 Run all benchmarks"
+	@echo "  benchmark-*    - 🚀 Run specific package benchmarks"
 	@echo ""
 	@echo "Maintenance:"
 	@echo "  install   - 📦 Install/update dependencies"
@@ -61,6 +74,7 @@ install:
 clean:
 	@echo "🧹 Cleaning build artifacts..."
 	@rm -f dbsage
+	@rm -f coverage.out coverage.html
 	@go clean
 	@echo "✅ Clean complete!"
 
@@ -89,8 +103,59 @@ fmt:
 
 # Run tests
 test:
-	@echo "🧪 Running tests..."
+	@echo "🧪 Running all tests..."
 	@go test -v ./...
+
+# Run tests with coverage
+test-coverage:
+	@echo "🧪 Running tests with coverage..."
+	@go test -v -coverprofile=coverage.out ./...
+	@go tool cover -html=coverage.out -o coverage.html
+	@echo "✅ Coverage report generated: coverage.html"
+
+# Run tests for specific packages
+test-utils:
+	@echo "🧪 Running utils tests..."
+	@go test -v ./internal/utils/...
+
+test-models:
+	@echo "🧪 Running models tests..."
+	@go test -v ./internal/models/...
+
+test-database:
+	@echo "🧪 Running database tests..."
+	@go test -v ./pkg/database/...
+
+test-ai:
+	@echo "🧪 Running AI tests..."
+	@go test -v ./internal/ai/...
+
+test-ui:
+	@echo "🧪 Running UI tests..."
+	@go test -v ./internal/ui/...
+
+# Run tests with race detection
+test-race:
+	@echo "🧪 Running tests with race detection..."
+	@go test -race -v ./...
+
+# Run benchmarks
+benchmark:
+	@echo "🚀 Running benchmarks..."
+	@go test -bench=. -benchmem ./...
+
+# Run specific benchmark
+benchmark-utils:
+	@echo "🚀 Running utils benchmarks..."
+	@go test -bench=. -benchmem ./internal/utils/...
+
+benchmark-ai:
+	@echo "🚀 Running AI benchmarks..."
+	@go test -bench=. -benchmem ./internal/ai/...
+
+benchmark-ui:
+	@echo "🚀 Running UI benchmarks..."
+	@go test -bench=. -benchmem ./internal/ui/...
 
 # Release commands
 release-patch:

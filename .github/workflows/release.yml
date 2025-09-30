@@ -136,9 +136,20 @@ jobs:
       - name: Prepare release assets
         run: |
           mkdir -p release_assets
-          find ./artifacts -name "*.tar.gz" -o -name "*.zip" | while read file; do
-            cp "$file" release_assets/
+          # In download-artifact@v4, each artifact is in its own subdirectory
+          # Copy all archives from all subdirectories
+          for artifact_dir in ./artifacts/*/; do
+            if [ -d "$artifact_dir" ]; then
+              echo "Processing $artifact_dir"
+              find "$artifact_dir" -name "*.tar.gz" -o -name "*.zip" | while read file; do
+                if [ -f "$file" ]; then
+                  cp "$file" release_assets/
+                  echo "Copied: $(basename "$file")"
+                fi
+              done
+            fi
           done
+          echo "Final release assets:"
           ls -la release_assets/
 
       - name: Generate checksums

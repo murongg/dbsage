@@ -342,29 +342,119 @@ func (o *SQLiteQueryOptimizer) suggestWhereClauseIndexes(tableName string) ([]mo
 	}
 	defer rows.Close()
 
+	// Check existing indexes to avoid duplicates
+	existingIndexes := make(map[string]bool)
+	indexQuery := fmt.Sprintf("PRAGMA index_list(%s)", tableName)
+	indexRows, err := o.db.Query(indexQuery)
+	if err == nil {
+		defer indexRows.Close()
+		for indexRows.Next() {
+			var seq int
+			var name, unique, origin string
+			var partial int
+			err := indexRows.Scan(&seq, &name, &unique, &origin, &partial)
+			if err == nil {
+				existingIndexes[name] = true
+			}
+		}
+	}
+
 	for rows.Next() {
 		var cid int
-		var name, dataType string
+		var columnName, dataType string
 		var notNull, pk int
 		var defaultValue sql.NullString
 
-		err := rows.Scan(&cid, &name, &dataType, &notNull, &defaultValue, &pk)
+		err := rows.Scan(&cid, &columnName, &dataType, &notNull, &defaultValue, &pk)
 		if err != nil {
 			continue
 		}
 
-		// Suggest indexes for non-primary key columns that might be used in WHERE clauses
-		if pk == 0 && (strings.Contains(strings.ToLower(dataType), "int") ||
-			strings.Contains(strings.ToLower(dataType), "text") ||
-			strings.Contains(strings.ToLower(dataType), "varchar")) {
+		// Skip primary key columns (they already have indexes)
+		if pk == 1 {
+			continue
+		}
 
+		// Check if column already has an index
+		indexName := fmt.Sprintf("idx_%s_%s", tableName, columnName)
+		if existingIndexes[indexName] {
+			continue
+		}
+
+		// Suggest indexes based on data type and common usage patterns
+		shouldIndex := false
+		reason := ""
+		impact := "medium"
+
+		dataTypeLower := strings.ToLower(dataType)
+		columnNameLower := strings.ToLower(columnName)
+
+		switch {
+		case strings.Contains(dataTypeLower, "integer") || strings.Contains(dataTypeLower, "int"):
+			shouldIndex = true
+			reason = fmt.Sprintf("Integer column '%s' could benefit from an index for equality and range queries", columnName)
+			impact = "medium"
+
+		case strings.Contains(dataTypeLower, "text"):
+			shouldIndex = true
+			reason = fmt.Sprintf("Text column '%s' could benefit from an index for equality queries and sorting", columnName)
+			impact = "medium"
+
+			// For text columns that might contain large content, suggest they might not need indexing
+			if strings.Contains(columnNameLower, "content") ||
+				strings.Contains(columnNameLower, "description") ||
+				strings.Contains(columnNameLower, "body") {
+				reason = fmt.Sprintf("Text column '%s' might not need an index if it contains large text content", columnName)
+				impact = "low"
+			}
+
+		case strings.Contains(dataTypeLower, "varchar") || strings.Contains(dataTypeLower, "char"):
+			shouldIndex = true
+			reason = fmt.Sprintf("String column '%s' could benefit from an index for equality queries", columnName)
+			impact = "medium"
+
+		case strings.Contains(dataTypeLower, "real") || strings.Contains(dataTypeLower, "numeric") || strings.Contains(dataTypeLower, "decimal"):
+			shouldIndex = true
+			reason = fmt.Sprintf("Numeric column '%s' could benefit from an index for range queries and sorting", columnName)
+			impact = "medium"
+
+		case strings.Contains(dataTypeLower, "date") || strings.Contains(dataTypeLower, "time"):
+			shouldIndex = true
+			reason = fmt.Sprintf("Date/time column '%s' could benefit from an index for range queries and sorting", columnName)
+			impact = "high"
+
+		case strings.Contains(dataTypeLower, "blob"):
+			// Generally don't index BLOB columns
+			shouldIndex = false
+		}
+
+		// Special cases based on column names (common patterns)
+		if shouldIndex {
+			if strings.Contains(columnNameLower, "email") {
+				reason = fmt.Sprintf("Email column '%s' should have an index for user lookups", columnName)
+				impact = "high"
+			} else if strings.Contains(columnNameLower, "status") || strings.Contains(columnNameLower, "state") {
+				reason = fmt.Sprintf("Status column '%s' should have an index for filtering queries", columnName)
+				impact = "high"
+			} else if strings.Contains(columnNameLower, "created") || strings.Contains(columnNameLower, "updated") {
+				reason = fmt.Sprintf("Timestamp column '%s' should have an index for date range queries", columnName)
+				impact = "high"
+			} else if strings.Contains(columnNameLower, "user") && strings.Contains(columnNameLower, "id") {
+				reason = fmt.Sprintf("User ID column '%s' should have an index for user-specific queries", columnName)
+				impact = "high"
+			}
+		}
+
+		if shouldIndex {
 			suggestion := models.IndexSuggestion{
-				TableName: tableName,
-				IndexName: fmt.Sprintf("idx_%s_%s", tableName, name),
-				Columns:   []string{name},
-				IndexType: "btree",
-				Reason:    fmt.Sprintf("Column %s might benefit from an index if used in WHERE clauses", name),
-				Impact:    "medium",
+				TableName:     tableName,
+				IndexName:     indexName,
+				Columns:       []string{columnName},
+				IndexType:     "btree",
+				Reason:        reason,
+				Impact:        impact,
+				CreateSQL:     fmt.Sprintf("CREATE INDEX %s ON %s (%s)", indexName, tableName, columnName),
+				EstimatedSize: "Small to Medium",
 			}
 			suggestions = append(suggestions, suggestion)
 		}
@@ -376,16 +466,233 @@ func (o *SQLiteQueryOptimizer) suggestWhereClauseIndexes(tableName string) ([]mo
 func (o *SQLiteQueryOptimizer) suggestCompositeIndexes(tableName string) ([]models.IndexSuggestion, error) {
 	suggestions := []models.IndexSuggestion{}
 
-	// This is a simplified heuristic - in practice, you'd analyze actual query patterns
-	suggestion := models.IndexSuggestion{
-		TableName: tableName,
-		IndexName: fmt.Sprintf("idx_%s_composite", tableName),
-		Columns:   []string{"column1", "column2"}, // Placeholder
-		IndexType: "btree",
-		Reason:    "Consider composite indexes for columns frequently used together in WHERE clauses",
-		Impact:    "high",
+	// Get table schema to analyze column patterns
+	query := fmt.Sprintf("PRAGMA table_info(%s)", tableName)
+	rows, err := o.db.Query(query)
+	if err != nil {
+		return suggestions, err
 	}
-	suggestions = append(suggestions, suggestion)
+	defer rows.Close()
+
+	var columns []struct {
+		name     string
+		dataType string
+		pk       int
+	}
+
+	for rows.Next() {
+		var cid int
+		var columnName, dataType string
+		var notNull, pk int
+		var defaultValue sql.NullString
+
+		err := rows.Scan(&cid, &columnName, &dataType, &notNull, &defaultValue, &pk)
+		if err != nil {
+			continue
+		}
+
+		columns = append(columns, struct {
+			name     string
+			dataType string
+			pk       int
+		}{columnName, dataType, pk})
+	}
+
+	// Check existing indexes to avoid duplicates
+	existingIndexes := make(map[string]bool)
+	indexQuery := fmt.Sprintf("PRAGMA index_list(%s)", tableName)
+	indexRows, err := o.db.Query(indexQuery)
+	if err == nil {
+		defer indexRows.Close()
+		for indexRows.Next() {
+			var seq int
+			var name, unique, origin string
+			var partial int
+			err := indexRows.Scan(&seq, &name, &unique, &origin, &partial)
+			if err == nil {
+				existingIndexes[name] = true
+			}
+		}
+	}
+
+	// Analyze foreign key relationships
+	fkQuery := fmt.Sprintf("PRAGMA foreign_key_list(%s)", tableName)
+	fkRows, err := o.db.Query(fkQuery)
+	if err == nil {
+		defer fkRows.Close()
+
+		var fkColumns []string
+		for fkRows.Next() {
+			var id, seq int
+			var table, from, to, onUpdate, onDelete, match string
+			err := fkRows.Scan(&id, &seq, &table, &from, &to, &onUpdate, &onDelete, &match)
+			if err == nil {
+				fkColumns = append(fkColumns, from)
+			}
+		}
+
+		// If we have multiple foreign keys, suggest a composite index
+		if len(fkColumns) >= 2 {
+			indexName := fmt.Sprintf("idx_%s_fk_composite", tableName)
+			if !existingIndexes[indexName] {
+				suggestion := models.IndexSuggestion{
+					TableName:     tableName,
+					IndexName:     indexName,
+					Columns:       fkColumns[:2], // Take first two FK columns
+					IndexType:     "btree",
+					Reason:        "Composite index on foreign key columns can improve JOIN performance",
+					Impact:        "high",
+					CreateSQL:     fmt.Sprintf("CREATE INDEX %s ON %s (%s, %s)", indexName, tableName, fkColumns[0], fkColumns[1]),
+					EstimatedSize: "Medium",
+				}
+				suggestions = append(suggestions, suggestion)
+			}
+		}
+	}
+
+	// Look for common column name patterns that often work well together
+	var statusCol, dateCol, userCol, createdCol string
+
+	for _, col := range columns {
+		if col.pk == 1 {
+			continue // Skip primary keys
+		}
+
+		colNameLower := strings.ToLower(col.name)
+
+		// Look for status/state columns
+		if statusCol == "" && (strings.Contains(colNameLower, "status") ||
+			strings.Contains(colNameLower, "state") ||
+			strings.Contains(colNameLower, "type")) {
+			statusCol = col.name
+		}
+
+		// Look for date/time columns
+		if dateCol == "" && (strings.Contains(colNameLower, "date") ||
+			strings.Contains(colNameLower, "time") ||
+			strings.Contains(colNameLower, "created") ||
+			strings.Contains(colNameLower, "updated")) {
+			dateCol = col.name
+		}
+
+		// Look for user-related columns
+		if userCol == "" && (strings.Contains(colNameLower, "user") ||
+			strings.Contains(colNameLower, "owner") ||
+			strings.Contains(colNameLower, "author")) {
+			userCol = col.name
+		}
+
+		// Look specifically for created_at/created_date columns
+		if createdCol == "" && (strings.Contains(colNameLower, "created")) {
+			createdCol = col.name
+		}
+	}
+
+	// Suggest status + date composite index
+	if statusCol != "" && dateCol != "" {
+		indexName := fmt.Sprintf("idx_%s_%s_%s", tableName, statusCol, dateCol)
+		if !existingIndexes[indexName] {
+			suggestion := models.IndexSuggestion{
+				TableName:     tableName,
+				IndexName:     indexName,
+				Columns:       []string{statusCol, dateCol},
+				IndexType:     "btree",
+				Reason:        fmt.Sprintf("Composite index on '%s' and '%s' can improve queries filtering by status and date", statusCol, dateCol),
+				Impact:        "high",
+				CreateSQL:     fmt.Sprintf("CREATE INDEX %s ON %s (%s, %s)", indexName, tableName, statusCol, dateCol),
+				EstimatedSize: "Medium",
+			}
+			suggestions = append(suggestions, suggestion)
+		}
+	}
+
+	// Suggest user + created composite index
+	if userCol != "" && createdCol != "" && userCol != createdCol {
+		indexName := fmt.Sprintf("idx_%s_%s_%s", tableName, userCol, createdCol)
+		if !existingIndexes[indexName] {
+			suggestion := models.IndexSuggestion{
+				TableName:     tableName,
+				IndexName:     indexName,
+				Columns:       []string{userCol, createdCol},
+				IndexType:     "btree",
+				Reason:        fmt.Sprintf("Composite index on '%s' and '%s' can improve user-specific queries with date filtering", userCol, createdCol),
+				Impact:        "high",
+				CreateSQL:     fmt.Sprintf("CREATE INDEX %s ON %s (%s, %s)", indexName, tableName, userCol, createdCol),
+				EstimatedSize: "Medium to Large",
+			}
+			suggestions = append(suggestions, suggestion)
+		}
+	}
+
+	// Look for integer columns that might work well together (like category_id + priority)
+	var intColumns []string
+	for _, col := range columns {
+		if col.pk == 1 {
+			continue
+		}
+		if strings.Contains(strings.ToLower(col.dataType), "int") {
+			intColumns = append(intColumns, col.name)
+		}
+	}
+
+	// If we have multiple integer columns, suggest a composite index for the first two
+	if len(intColumns) >= 2 {
+		indexName := fmt.Sprintf("idx_%s_%s_%s", tableName, intColumns[0], intColumns[1])
+		if !existingIndexes[indexName] {
+			suggestion := models.IndexSuggestion{
+				TableName:     tableName,
+				IndexName:     indexName,
+				Columns:       intColumns[:2],
+				IndexType:     "btree",
+				Reason:        fmt.Sprintf("Composite index on integer columns '%s' and '%s' might improve multi-column filtering", intColumns[0], intColumns[1]),
+				Impact:        "medium",
+				CreateSQL:     fmt.Sprintf("CREATE INDEX %s ON %s (%s, %s)", indexName, tableName, intColumns[0], intColumns[1]),
+				EstimatedSize: "Small to Medium",
+			}
+			suggestions = append(suggestions, suggestion)
+		}
+	}
+
+	// SQLite-specific: Suggest covering indexes for common SELECT patterns
+	// This is a heuristic based on common application patterns
+	if len(columns) >= 3 {
+		var smallColumns []string
+		for _, col := range columns {
+			if col.pk == 1 {
+				continue
+			}
+			// Include small columns that are often selected together
+			colNameLower := strings.ToLower(col.name)
+			dataTypeLower := strings.ToLower(col.dataType)
+
+			if (strings.Contains(dataTypeLower, "int") ||
+				strings.Contains(dataTypeLower, "text") ||
+				strings.Contains(dataTypeLower, "varchar")) &&
+				(strings.Contains(colNameLower, "name") ||
+					strings.Contains(colNameLower, "title") ||
+					strings.Contains(colNameLower, "status") ||
+					strings.Contains(colNameLower, "type")) {
+				smallColumns = append(smallColumns, col.name)
+			}
+		}
+
+		if len(smallColumns) >= 2 {
+			indexName := fmt.Sprintf("idx_%s_covering", tableName)
+			if !existingIndexes[indexName] {
+				suggestion := models.IndexSuggestion{
+					TableName:     tableName,
+					IndexName:     indexName,
+					Columns:       smallColumns[:2],
+					IndexType:     "btree",
+					Reason:        fmt.Sprintf("Covering index on '%s' and '%s' can improve SELECT performance by avoiding table lookups", smallColumns[0], smallColumns[1]),
+					Impact:        "medium",
+					CreateSQL:     fmt.Sprintf("CREATE INDEX %s ON %s (%s, %s)", indexName, tableName, smallColumns[0], smallColumns[1]),
+					EstimatedSize: "Medium",
+				}
+				suggestions = append(suggestions, suggestion)
+			}
+		}
+	}
 
 	return suggestions, nil
 }

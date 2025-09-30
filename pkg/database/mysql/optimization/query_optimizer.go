@@ -300,14 +300,171 @@ func (o *MySQLQueryOptimizer) suggestForeignKeyIndexes(tableName string) ([]mode
 }
 
 func (o *MySQLQueryOptimizer) suggestWhereClauseIndexes(tableName string) ([]models.IndexSuggestion, error) {
-	// This is a simplified implementation
-	// In a real scenario, you'd analyze actual query patterns from performance_schema
-	return []models.IndexSuggestion{}, nil
+	suggestions := []models.IndexSuggestion{}
+
+	// Get table columns that might benefit from indexes
+	query := `
+		SELECT 
+			column_name,
+			data_type,
+			is_nullable,
+			column_key
+		FROM information_schema.columns 
+		WHERE table_schema = DATABASE() 
+		AND table_name = ?
+		AND column_key = ''  -- Only non-indexed columns
+		ORDER BY ordinal_position
+	`
+
+	rows, err := o.db.Query(query, tableName)
+	if err != nil {
+		return suggestions, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var columnName, dataType, isNullable, columnKey string
+		err := rows.Scan(&columnName, &dataType, &isNullable, &columnKey)
+		if err != nil {
+			continue
+		}
+
+		// Suggest indexes for columns that are commonly used in WHERE clauses
+		// Focus on integer, varchar, and date columns
+		if strings.Contains(strings.ToLower(dataType), "int") ||
+			strings.Contains(strings.ToLower(dataType), "varchar") ||
+			strings.Contains(strings.ToLower(dataType), "char") ||
+			strings.Contains(strings.ToLower(dataType), "date") ||
+			strings.Contains(strings.ToLower(dataType), "time") {
+
+			suggestion := models.IndexSuggestion{
+				TableName:     tableName,
+				IndexName:     fmt.Sprintf("idx_%s_%s", tableName, columnName),
+				Columns:       []string{columnName},
+				IndexType:     "btree",
+				Reason:        fmt.Sprintf("Column '%s' (%s) could benefit from an index if used in WHERE clauses", columnName, dataType),
+				Impact:        "medium",
+				CreateSQL:     fmt.Sprintf("CREATE INDEX idx_%s_%s ON %s (%s)", tableName, columnName, tableName, columnName),
+				EstimatedSize: "Small to Medium",
+			}
+			suggestions = append(suggestions, suggestion)
+		}
+	}
+
+	return suggestions, nil
 }
 
 func (o *MySQLQueryOptimizer) suggestCompositeIndexes(tableName string) ([]models.IndexSuggestion, error) {
-	// This would analyze query patterns to suggest composite indexes
-	return []models.IndexSuggestion{}, nil
+	suggestions := []models.IndexSuggestion{}
+
+	// Try to analyze common column combinations that might benefit from composite indexes
+	// This is a heuristic-based approach since we don't have access to actual query logs
+
+	// Get foreign key columns - these are often used together in JOINs
+	fkQuery := `
+		SELECT 
+			kcu.column_name,
+			kcu.referenced_table_name,
+			kcu.referenced_column_name
+		FROM information_schema.key_column_usage kcu
+		WHERE kcu.table_schema = DATABASE()
+		AND kcu.table_name = ?
+		AND kcu.referenced_table_name IS NOT NULL
+		ORDER BY kcu.ordinal_position
+	`
+
+	fkRows, err := o.db.Query(fkQuery, tableName)
+	if err == nil {
+		defer fkRows.Close()
+
+		var fkColumns []string
+		for fkRows.Next() {
+			var columnName, refTable, refColumn string
+			err := fkRows.Scan(&columnName, &refTable, &refColumn)
+			if err == nil {
+				fkColumns = append(fkColumns, columnName)
+			}
+		}
+
+		// If we have multiple foreign keys, suggest a composite index
+		if len(fkColumns) >= 2 {
+			suggestion := models.IndexSuggestion{
+				TableName:     tableName,
+				IndexName:     fmt.Sprintf("idx_%s_fk_composite", tableName),
+				Columns:       fkColumns[:2], // Take first two FK columns
+				IndexType:     "btree",
+				Reason:        "Composite index on foreign key columns can improve JOIN performance",
+				Impact:        "high",
+				CreateSQL:     fmt.Sprintf("CREATE INDEX idx_%s_fk_composite ON %s (%s)", tableName, tableName, strings.Join(fkColumns[:2], ", ")),
+				EstimatedSize: "Medium",
+			}
+			suggestions = append(suggestions, suggestion)
+		}
+	}
+
+	// Look for common patterns: status + date columns
+	statusDateQuery := `
+		SELECT 
+			c1.column_name as status_col,
+			c2.column_name as date_col
+		FROM information_schema.columns c1
+		JOIN information_schema.columns c2 ON c1.table_name = c2.table_name AND c1.table_schema = c2.table_schema
+		WHERE c1.table_schema = DATABASE() 
+		AND c1.table_name = ?
+		AND (c1.column_name LIKE '%status%' OR c1.column_name LIKE '%state%' OR c1.column_name LIKE '%type%')
+		AND (c2.column_name LIKE '%date%' OR c2.column_name LIKE '%time%' OR c2.column_name LIKE '%created%' OR c2.column_name LIKE '%updated%')
+		AND c1.column_name != c2.column_name
+		LIMIT 1
+	`
+
+	var statusCol, dateCol string
+	err = o.db.QueryRow(statusDateQuery, tableName).Scan(&statusCol, &dateCol)
+	if err == nil {
+		suggestion := models.IndexSuggestion{
+			TableName:     tableName,
+			IndexName:     fmt.Sprintf("idx_%s_%s_%s", tableName, statusCol, dateCol),
+			Columns:       []string{statusCol, dateCol},
+			IndexType:     "btree",
+			Reason:        fmt.Sprintf("Composite index on '%s' and '%s' can improve queries filtering by status and date", statusCol, dateCol),
+			Impact:        "high",
+			CreateSQL:     fmt.Sprintf("CREATE INDEX idx_%s_%s_%s ON %s (%s, %s)", tableName, statusCol, dateCol, tableName, statusCol, dateCol),
+			EstimatedSize: "Medium",
+		}
+		suggestions = append(suggestions, suggestion)
+	}
+
+	// Look for user_id + created_at pattern (common in many applications)
+	userDateQuery := `
+		SELECT 
+			c1.column_name as user_col,
+			c2.column_name as date_col
+		FROM information_schema.columns c1
+		JOIN information_schema.columns c2 ON c1.table_name = c2.table_name AND c1.table_schema = c2.table_schema
+		WHERE c1.table_schema = DATABASE() 
+		AND c1.table_name = ?
+		AND (c1.column_name LIKE '%user%' OR c1.column_name LIKE '%owner%' OR c1.column_name LIKE '%author%')
+		AND (c2.column_name LIKE '%created%' OR c2.column_name LIKE '%date%' OR c2.column_name LIKE '%time%')
+		AND c1.column_name != c2.column_name
+		LIMIT 1
+	`
+
+	var userCol, createdCol string
+	err = o.db.QueryRow(userDateQuery, tableName).Scan(&userCol, &createdCol)
+	if err == nil {
+		suggestion := models.IndexSuggestion{
+			TableName:     tableName,
+			IndexName:     fmt.Sprintf("idx_%s_%s_%s", tableName, userCol, createdCol),
+			Columns:       []string{userCol, createdCol},
+			IndexType:     "btree",
+			Reason:        fmt.Sprintf("Composite index on '%s' and '%s' can improve user-specific queries with date filtering", userCol, createdCol),
+			Impact:        "high",
+			CreateSQL:     fmt.Sprintf("CREATE INDEX idx_%s_%s_%s ON %s (%s, %s)", tableName, userCol, createdCol, tableName, userCol, createdCol),
+			EstimatedSize: "Medium to Large",
+		}
+		suggestions = append(suggestions, suggestion)
+	}
+
+	return suggestions, nil
 }
 
 func (o *MySQLQueryOptimizer) extractTablesFromQuery(query string) []string {

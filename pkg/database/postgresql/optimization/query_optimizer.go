@@ -292,14 +292,322 @@ func (o *PostgreSQLQueryOptimizer) suggestForeignKeyIndexes(tableName string) ([
 }
 
 func (o *PostgreSQLQueryOptimizer) suggestWhereClauseIndexes(tableName string) ([]models.IndexSuggestion, error) {
-	// This is a simplified implementation
-	// In a real scenario, you'd analyze actual query patterns from pg_stat_statements
-	return []models.IndexSuggestion{}, nil
+	suggestions := []models.IndexSuggestion{}
+
+	// Get table columns that might benefit from indexes
+	query := `
+		SELECT 
+			c.column_name,
+			c.data_type,
+			c.is_nullable,
+			CASE WHEN i.indexname IS NOT NULL THEN 'indexed' ELSE 'not_indexed' END as index_status
+		FROM information_schema.columns c
+		LEFT JOIN pg_indexes i ON i.tablename = c.table_name 
+			AND i.indexdef LIKE '%' || c.column_name || '%'
+			AND i.schemaname = c.table_schema
+		WHERE c.table_schema = 'public' 
+		AND c.table_name = $1
+		AND i.indexname IS NULL  -- Only non-indexed columns
+		ORDER BY c.ordinal_position
+	`
+
+	rows, err := o.db.Query(query, tableName)
+	if err != nil {
+		return suggestions, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var columnName, dataType, isNullable, indexStatus string
+		err := rows.Scan(&columnName, &dataType, &isNullable, &indexStatus)
+		if err != nil {
+			continue
+		}
+
+		// Suggest indexes for columns that are commonly used in WHERE clauses
+		// Focus on integer, text, varchar, and timestamp columns
+		shouldIndex := false
+		indexType := "btree"
+		reason := ""
+
+		switch {
+		case strings.Contains(strings.ToLower(dataType), "integer") ||
+			strings.Contains(strings.ToLower(dataType), "bigint") ||
+			strings.Contains(strings.ToLower(dataType), "smallint"):
+			shouldIndex = true
+			reason = fmt.Sprintf("Integer column '%s' could benefit from a B-tree index for equality and range queries", columnName)
+
+		case strings.Contains(strings.ToLower(dataType), "text") ||
+			strings.Contains(strings.ToLower(dataType), "varchar") ||
+			strings.Contains(strings.ToLower(dataType), "character"):
+			shouldIndex = true
+			reason = fmt.Sprintf("Text column '%s' could benefit from a B-tree index for equality queries", columnName)
+			// Also suggest GIN index for full-text search if it's a text column
+			if strings.Contains(strings.ToLower(dataType), "text") {
+				ginSuggestion := models.IndexSuggestion{
+					TableName:     tableName,
+					IndexName:     fmt.Sprintf("idx_%s_%s_gin", tableName, columnName),
+					Columns:       []string{columnName},
+					IndexType:     "gin",
+					Reason:        fmt.Sprintf("GIN index on text column '%s' for full-text search capabilities", columnName),
+					Impact:        "high",
+					CreateSQL:     fmt.Sprintf("CREATE INDEX idx_%s_%s_gin ON %s USING gin(to_tsvector('english', %s))", tableName, columnName, tableName, columnName),
+					EstimatedSize: "Medium to Large",
+				}
+				suggestions = append(suggestions, ginSuggestion)
+			}
+
+		case strings.Contains(strings.ToLower(dataType), "timestamp") ||
+			strings.Contains(strings.ToLower(dataType), "date") ||
+			strings.Contains(strings.ToLower(dataType), "time"):
+			shouldIndex = true
+			reason = fmt.Sprintf("Date/time column '%s' could benefit from a B-tree index for range queries and sorting", columnName)
+
+		case strings.Contains(strings.ToLower(dataType), "uuid"):
+			shouldIndex = true
+			reason = fmt.Sprintf("UUID column '%s' could benefit from a B-tree index for equality queries", columnName)
+
+		case strings.Contains(strings.ToLower(dataType), "boolean"):
+			// Boolean columns usually don't need indexes unless the distribution is very skewed
+			if strings.Contains(strings.ToLower(columnName), "active") ||
+				strings.Contains(strings.ToLower(columnName), "enabled") ||
+				strings.Contains(strings.ToLower(columnName), "deleted") {
+				shouldIndex = true
+				reason = fmt.Sprintf("Boolean column '%s' might benefit from a partial index if the distribution is skewed", columnName)
+			}
+		}
+
+		if shouldIndex {
+			suggestion := models.IndexSuggestion{
+				TableName:     tableName,
+				IndexName:     fmt.Sprintf("idx_%s_%s", tableName, columnName),
+				Columns:       []string{columnName},
+				IndexType:     indexType,
+				Reason:        reason,
+				Impact:        "medium",
+				CreateSQL:     fmt.Sprintf("CREATE INDEX idx_%s_%s ON %s (%s)", tableName, columnName, tableName, columnName),
+				EstimatedSize: "Small to Medium",
+			}
+			suggestions = append(suggestions, suggestion)
+		}
+	}
+
+	return suggestions, nil
 }
 
 func (o *PostgreSQLQueryOptimizer) suggestCompositeIndexes(tableName string) ([]models.IndexSuggestion, error) {
-	// This would analyze query patterns to suggest composite indexes
-	return []models.IndexSuggestion{}, nil
+	suggestions := []models.IndexSuggestion{}
+
+	// Get foreign key columns - these are often used together in JOINs
+	fkQuery := `
+		SELECT 
+			kcu.column_name,
+			kcu.constraint_name,
+			ccu.table_name AS foreign_table_name,
+			ccu.column_name AS foreign_column_name
+		FROM information_schema.key_column_usage kcu
+		JOIN information_schema.constraint_column_usage ccu 
+			ON kcu.constraint_name = ccu.constraint_name
+		JOIN information_schema.table_constraints tc 
+			ON kcu.constraint_name = tc.constraint_name
+		WHERE tc.constraint_type = 'FOREIGN KEY'
+		AND kcu.table_schema = 'public'
+		AND kcu.table_name = $1
+		ORDER BY kcu.ordinal_position
+	`
+
+	fkRows, err := o.db.Query(fkQuery, tableName)
+	if err == nil {
+		defer fkRows.Close()
+
+		var fkColumns []string
+		for fkRows.Next() {
+			var columnName, constraintName, foreignTable, foreignColumn string
+			err := fkRows.Scan(&columnName, &constraintName, &foreignTable, &foreignColumn)
+			if err == nil {
+				fkColumns = append(fkColumns, columnName)
+			}
+		}
+
+		// If we have multiple foreign keys, suggest a composite index
+		if len(fkColumns) >= 2 {
+			suggestion := models.IndexSuggestion{
+				TableName:     tableName,
+				IndexName:     fmt.Sprintf("idx_%s_fk_composite", tableName),
+				Columns:       fkColumns[:2], // Take first two FK columns
+				IndexType:     "btree",
+				Reason:        "Composite index on foreign key columns can significantly improve JOIN performance",
+				Impact:        "high",
+				CreateSQL:     fmt.Sprintf("CREATE INDEX idx_%s_fk_composite ON %s (%s)", tableName, tableName, strings.Join(fkColumns[:2], ", ")),
+				EstimatedSize: "Medium",
+			}
+			suggestions = append(suggestions, suggestion)
+		}
+	}
+
+	// Look for common patterns: status + timestamp columns
+	statusDateQuery := `
+		SELECT 
+			c1.column_name as status_col,
+			c2.column_name as date_col,
+			c1.data_type as status_type,
+			c2.data_type as date_type
+		FROM information_schema.columns c1
+		JOIN information_schema.columns c2 ON c1.table_name = c2.table_name AND c1.table_schema = c2.table_schema
+		WHERE c1.table_schema = 'public' 
+		AND c1.table_name = $1
+		AND (c1.column_name ILIKE '%status%' OR c1.column_name ILIKE '%state%' OR c1.column_name ILIKE '%type%')
+		AND (c2.column_name ILIKE '%date%' OR c2.column_name ILIKE '%time%' OR c2.column_name ILIKE '%created%' OR c2.column_name ILIKE '%updated%')
+		AND c1.column_name != c2.column_name
+		LIMIT 1
+	`
+
+	var statusCol, dateCol, statusType, dateType string
+	err = o.db.QueryRow(statusDateQuery, tableName).Scan(&statusCol, &dateCol, &statusType, &dateType)
+	if err == nil {
+		suggestion := models.IndexSuggestion{
+			TableName:     tableName,
+			IndexName:     fmt.Sprintf("idx_%s_%s_%s", tableName, statusCol, dateCol),
+			Columns:       []string{statusCol, dateCol},
+			IndexType:     "btree",
+			Reason:        fmt.Sprintf("Composite index on '%s' and '%s' can improve queries filtering by status and date/time", statusCol, dateCol),
+			Impact:        "high",
+			CreateSQL:     fmt.Sprintf("CREATE INDEX idx_%s_%s_%s ON %s (%s, %s)", tableName, statusCol, dateCol, tableName, statusCol, dateCol),
+			EstimatedSize: "Medium",
+		}
+		suggestions = append(suggestions, suggestion)
+	}
+
+	// Look for user_id + created_at pattern (very common in web applications)
+	userDateQuery := `
+		SELECT 
+			c1.column_name as user_col,
+			c2.column_name as date_col
+		FROM information_schema.columns c1
+		JOIN information_schema.columns c2 ON c1.table_name = c2.table_name AND c1.table_schema = c2.table_schema
+		WHERE c1.table_schema = 'public' 
+		AND c1.table_name = $1
+		AND (c1.column_name ILIKE '%user%' OR c1.column_name ILIKE '%owner%' OR c1.column_name ILIKE '%author%' OR c1.column_name ILIKE '%creator%')
+		AND (c2.column_name ILIKE '%created%' OR c2.column_name ILIKE '%date%' OR c2.column_name ILIKE '%time%')
+		AND c1.column_name != c2.column_name
+		LIMIT 1
+	`
+
+	var userCol, createdCol string
+	err = o.db.QueryRow(userDateQuery, tableName).Scan(&userCol, &createdCol)
+	if err == nil {
+		suggestion := models.IndexSuggestion{
+			TableName:     tableName,
+			IndexName:     fmt.Sprintf("idx_%s_%s_%s", tableName, userCol, createdCol),
+			Columns:       []string{userCol, createdCol},
+			IndexType:     "btree",
+			Reason:        fmt.Sprintf("Composite index on '%s' and '%s' can improve user-specific queries with date filtering", userCol, createdCol),
+			Impact:        "high",
+			CreateSQL:     fmt.Sprintf("CREATE INDEX idx_%s_%s_%s ON %s (%s, %s)", tableName, userCol, createdCol, tableName, userCol, createdCol),
+			EstimatedSize: "Medium to Large",
+		}
+		suggestions = append(suggestions, suggestion)
+	}
+
+	// Look for JSONB columns that might benefit from GIN indexes
+	jsonbQuery := `
+		SELECT column_name
+		FROM information_schema.columns
+		WHERE table_schema = 'public'
+		AND table_name = $1
+		AND data_type = 'jsonb'
+	`
+
+	jsonbRows, err := o.db.Query(jsonbQuery, tableName)
+	if err == nil {
+		defer jsonbRows.Close()
+
+		for jsonbRows.Next() {
+			var columnName string
+			err := jsonbRows.Scan(&columnName)
+			if err == nil {
+				suggestion := models.IndexSuggestion{
+					TableName:     tableName,
+					IndexName:     fmt.Sprintf("idx_%s_%s_gin", tableName, columnName),
+					Columns:       []string{columnName},
+					IndexType:     "gin",
+					Reason:        fmt.Sprintf("GIN index on JSONB column '%s' for efficient JSON queries and operations", columnName),
+					Impact:        "high",
+					CreateSQL:     fmt.Sprintf("CREATE INDEX idx_%s_%s_gin ON %s USING gin(%s)", tableName, columnName, tableName, columnName),
+					EstimatedSize: "Medium to Large",
+				}
+				suggestions = append(suggestions, suggestion)
+			}
+		}
+	}
+
+	// Look for array columns that might benefit from GIN indexes
+	arrayQuery := `
+		SELECT column_name, data_type
+		FROM information_schema.columns
+		WHERE table_schema = 'public'
+		AND table_name = $1
+		AND data_type LIKE '%[]'
+	`
+
+	arrayRows, err := o.db.Query(arrayQuery, tableName)
+	if err == nil {
+		defer arrayRows.Close()
+
+		for arrayRows.Next() {
+			var columnName, dataType string
+			err := arrayRows.Scan(&columnName, &dataType)
+			if err == nil {
+				suggestion := models.IndexSuggestion{
+					TableName:     tableName,
+					IndexName:     fmt.Sprintf("idx_%s_%s_gin", tableName, columnName),
+					Columns:       []string{columnName},
+					IndexType:     "gin",
+					Reason:        fmt.Sprintf("GIN index on array column '%s' (%s) for efficient array operations and containment queries", columnName, dataType),
+					Impact:        "high",
+					CreateSQL:     fmt.Sprintf("CREATE INDEX idx_%s_%s_gin ON %s USING gin(%s)", tableName, columnName, tableName, columnName),
+					EstimatedSize: "Medium",
+				}
+				suggestions = append(suggestions, suggestion)
+			}
+		}
+	}
+
+	// Suggest partial indexes for boolean columns with likely skewed distribution
+	partialIndexQuery := `
+		SELECT column_name
+		FROM information_schema.columns
+		WHERE table_schema = 'public'
+		AND table_name = $1
+		AND data_type = 'boolean'
+		AND (column_name ILIKE '%active%' OR column_name ILIKE '%enabled%' OR column_name ILIKE '%deleted%' OR column_name ILIKE '%published%')
+	`
+
+	partialRows, err := o.db.Query(partialIndexQuery, tableName)
+	if err == nil {
+		defer partialRows.Close()
+
+		for partialRows.Next() {
+			var columnName string
+			err := partialRows.Scan(&columnName)
+			if err == nil {
+				// Suggest partial index for TRUE values (usually the minority)
+				suggestion := models.IndexSuggestion{
+					TableName:     tableName,
+					IndexName:     fmt.Sprintf("idx_%s_%s_true", tableName, columnName),
+					Columns:       []string{columnName},
+					IndexType:     "btree",
+					Reason:        fmt.Sprintf("Partial index on '%s' for TRUE values can be very efficient if most records are FALSE", columnName),
+					Impact:        "medium",
+					CreateSQL:     fmt.Sprintf("CREATE INDEX idx_%s_%s_true ON %s (%s) WHERE %s = true", tableName, columnName, tableName, columnName, columnName),
+					EstimatedSize: "Small",
+				}
+				suggestions = append(suggestions, suggestion)
+			}
+		}
+	}
+
+	return suggestions, nil
 }
 
 func (o *PostgreSQLQueryOptimizer) extractTablesFromQuery(query string) []string {

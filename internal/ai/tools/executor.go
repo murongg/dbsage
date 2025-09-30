@@ -90,7 +90,10 @@ func (e *Executor) executeSQL(dbTools dbinterfaces.DatabaseInterface, args map[s
 	if err != nil {
 		return "", err
 	}
-	resultJSON, _ := json.Marshal(result)
+	resultJSON, err := json.Marshal(result)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal SQL result: %w", err)
+	}
 	return string(resultJSON), nil
 }
 
@@ -99,7 +102,10 @@ func (e *Executor) getAllTables(dbTools dbinterfaces.DatabaseInterface) (string,
 	if err != nil {
 		return "", err
 	}
-	resultJSON, _ := json.Marshal(tables)
+	resultJSON, err := json.Marshal(tables)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal tables: %w", err)
+	}
 	return string(resultJSON), nil
 }
 
@@ -112,7 +118,10 @@ func (e *Executor) getTableSchema(dbTools dbinterfaces.DatabaseInterface, args m
 	if err != nil {
 		return "", err
 	}
-	resultJSON, _ := json.Marshal(schema)
+	resultJSON, err := json.Marshal(schema)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal schema: %w", err)
+	}
 	return string(resultJSON), nil
 }
 
@@ -125,7 +134,10 @@ func (e *Executor) explainQuery(dbTools dbinterfaces.DatabaseInterface, args map
 	if err != nil {
 		return "", err
 	}
-	resultJSON, _ := json.Marshal(result)
+	resultJSON, err := json.Marshal(result)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal explain result: %w", err)
+	}
 	return string(resultJSON), nil
 }
 
@@ -138,7 +150,10 @@ func (e *Executor) getTableIndexes(dbTools dbinterfaces.DatabaseInterface, args 
 	if err != nil {
 		return "", err
 	}
-	resultJSON, _ := json.Marshal(indexes)
+	resultJSON, err := json.Marshal(indexes)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal indexes: %w", err)
+	}
 	return string(resultJSON), nil
 }
 
@@ -151,7 +166,10 @@ func (e *Executor) getTableStats(dbTools dbinterfaces.DatabaseInterface, args ma
 	if err != nil {
 		return "", err
 	}
-	resultJSON, _ := json.Marshal(stats)
+	resultJSON, err := json.Marshal(stats)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal stats: %w", err)
+	}
 	return string(resultJSON), nil
 }
 
@@ -174,7 +192,10 @@ func (e *Executor) findDuplicateData(dbTools dbinterfaces.DatabaseInterface, arg
 	if err != nil {
 		return "", err
 	}
-	resultJSON, _ := json.Marshal(result)
+	resultJSON, err := json.Marshal(result)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal duplicate result: %w", err)
+	}
 	return string(resultJSON), nil
 }
 
@@ -183,7 +204,10 @@ func (e *Executor) getSlowQueries(dbTools dbinterfaces.DatabaseInterface) (strin
 	if err != nil {
 		return "", err
 	}
-	resultJSON, _ := json.Marshal(queries)
+	resultJSON, err := json.Marshal(queries)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal queries: %w", err)
+	}
 	return string(resultJSON), nil
 }
 
@@ -192,7 +216,10 @@ func (e *Executor) getDatabaseSize(dbTools dbinterfaces.DatabaseInterface) (stri
 	if err != nil {
 		return "", err
 	}
-	resultJSON, _ := json.Marshal(size)
+	resultJSON, err := json.Marshal(size)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal size: %w", err)
+	}
 	return string(resultJSON), nil
 }
 
@@ -201,7 +228,10 @@ func (e *Executor) getTableSizes(dbTools dbinterfaces.DatabaseInterface) (string
 	if err != nil {
 		return "", err
 	}
-	resultJSON, _ := json.Marshal(sizes)
+	resultJSON, err := json.Marshal(sizes)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal sizes: %w", err)
+	}
 	return string(resultJSON), nil
 }
 
@@ -210,7 +240,10 @@ func (e *Executor) getActiveConnections(dbTools dbinterfaces.DatabaseInterface) 
 	if err != nil {
 		return "", err
 	}
-	resultJSON, _ := json.Marshal(connections)
+	resultJSON, err := json.Marshal(connections)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal connections: %w", err)
+	}
 	return string(resultJSON), nil
 }
 
@@ -223,7 +256,10 @@ func (e *Executor) analyzeQueryPerformance(dbTools dbinterfaces.DatabaseInterfac
 	if err != nil {
 		return "", err
 	}
-	resultJSON, _ := json.Marshal(analysis)
+	resultJSON, err := json.Marshal(analysis)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal analysis: %w", err)
+	}
 	return string(resultJSON), nil
 }
 
@@ -236,7 +272,10 @@ func (e *Executor) suggestIndexes(dbTools dbinterfaces.DatabaseInterface, args m
 	if err != nil {
 		return "", err
 	}
-	resultJSON, _ := json.Marshal(suggestions)
+	resultJSON, err := json.Marshal(suggestions)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal suggestions: %w", err)
+	}
 	return string(resultJSON), nil
 }
 
@@ -245,7 +284,10 @@ func (e *Executor) getQueryPatterns(dbTools dbinterfaces.DatabaseInterface) (str
 	if err != nil {
 		return "", err
 	}
-	resultJSON, _ := json.Marshal(patterns)
+	resultJSON, err := json.Marshal(patterns)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal patterns: %w", err)
+	}
 	return string(resultJSON), nil
 }
 
@@ -258,7 +300,10 @@ func (e *Executor) optimizeQuery(dbTools dbinterfaces.DatabaseInterface, args ma
 	if err != nil {
 		return "", err
 	}
-	resultJSON, _ := json.Marshal(suggestions)
+	resultJSON, err := json.Marshal(suggestions)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal optimization suggestions: %w", err)
+	}
 	return string(resultJSON), nil
 }
 
@@ -271,6 +316,9 @@ func (e *Executor) analyzeTablePerformance(dbTools dbinterfaces.DatabaseInterfac
 	if err != nil {
 		return "", err
 	}
-	resultJSON, _ := json.Marshal(analysis)
+	resultJSON, err := json.Marshal(analysis)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal table analysis: %w", err)
+	}
 	return string(resultJSON), nil
 }

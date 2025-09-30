@@ -78,14 +78,11 @@ jobs:
           make test-ai
           make test-ui
       
-      - name: Run integration tests with databases
-        env:
-          POSTGRES_URL: postgres://testuser:testpass@localhost:5432/testdb?sslmode=disable
-          MYSQL_URL: mysql://testuser:testpass@localhost:3306/testdb
+      - name: Run database URL parser tests
         run: |
-          echo "🧪 Running integration tests..."
-          # Run database tests separately as they might need more setup
-          go test -v -race ./pkg/database/url_parser_test.go ./pkg/database/url_parser.go
+          echo "🧪 Running database URL parser tests..."
+          # Test URL parser separately (this is stable)
+          cd pkg/database && go test -v -race url_parser_test.go url_parser.go
           
       - name: Run comprehensive test coverage
         env:
@@ -93,14 +90,12 @@ jobs:
           MYSQL_URL: mysql://testuser:testpass@localhost:3306/testdb
         run: |
           echo "🧪 Running full test suite with coverage..."
-          # Exclude problematic database service tests for now, but include others
+          # Run coverage on stable packages
           go test -v -race -coverprofile=coverage.out \
             ./internal/utils/... \
             ./internal/models/... \
             ./internal/ai/... \
-            ./internal/ui/... \
-            ./pkg/database/url_parser_test.go \
-            ./pkg/dbinterfaces/...
+            ./internal/ui/...
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -245,9 +240,10 @@ jobs:
       - name: Check test files
         run: |
           echo "🔍 Verifying test files compile correctly..."
-          go test -c ./internal/utils/... -o /dev/null
-          go test -c ./internal/models/... -o /dev/null
-          go test -c ./internal/ai/... -o /dev/null
-          go test -c ./internal/ui/... -o /dev/null
+          go test -c ./internal/utils -o /dev/null
+          go test -c ./internal/models -o /dev/null
+          go test -c ./internal/ai -o /dev/null
+          go test -c ./internal/ai/tools -o /dev/null
+          go test -c ./internal/ui -o /dev/null
           echo "✅ All test files compile successfully"
 

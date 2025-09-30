@@ -310,6 +310,6 @@ func BenchmarkQueryResultJSON(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		json.Marshal(result)
+		_, _ = json.Marshal(result)
 	}
 }

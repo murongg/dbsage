@@ -98,7 +98,11 @@ func (c *SQLiteTableStatsCollector) GetTableSizes() ([]map[string]interface{}, e
 		// Get row count for each table
 		var rowCount int64
 		rowCountQuery := fmt.Sprintf("SELECT COUNT(*) FROM %s", tableName)
-		c.db.QueryRow(rowCountQuery).Scan(&rowCount)
+		err = c.db.QueryRow(rowCountQuery).Scan(&rowCount)
+		if err != nil {
+			// If we can't get row count, skip this table
+			continue
+		}
 
 		// Estimate table size based on row count proportion
 		// This is a rough estimation since SQLite doesn't provide per-table sizes

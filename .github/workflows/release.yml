@@ -1,0 +1,218 @@
+name: Release DBSage
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Release DBSage
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            binary_suffix: ""
+            archive_suffix: "linux_amd64.tar.gz"
+          - goos: linux
+            goarch: arm64
+            binary_suffix: ""
+            archive_suffix: "linux_arm64.tar.gz"
+          - goos: darwin
+            goarch: amd64
+            binary_suffix: ""
+            archive_suffix: "darwin_amd64.tar.gz"
+          - goos: darwin
+            goarch: arm64
+            binary_suffix: ""
+            archive_suffix: "darwin_arm64.tar.gz"
+          - goos: windows
+            goarch: amd64
+            binary_suffix: ".exe"
+            archive_suffix: "windows_amd64.zip"
+          - goos: windows
+            goarch: arm64
+            binary_suffix: ".exe"
+            archive_suffix: "windows_arm64.zip"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          mkdir -p dist
+          go mod tidy
+          go mod download
+          
+          # Build the binary
+          binary_name="dbsage${{ matrix.binary_suffix }}"
+          go build -ldflags="-w -s -X main.Version=${{ steps.version.outputs.VERSION }}" \
+                   -o "dist/${binary_name}" \
+                   ./cmd/dbsage/main.go
+          
+          # Create archive
+          cd dist
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            zip "../dbsage_${{ matrix.archive_suffix }}" "${binary_name}" ../README.md ../LICENSE || true
+          else
+            tar -czf "../dbsage_${{ matrix.archive_suffix }}" "${binary_name}" ../README.md ../LICENSE || true
+          fi
+          cd ..
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: dbsage_${{ matrix.archive_suffix }}
+          path: dbsage_${{ matrix.archive_suffix }}
+
+  create-release:
+    name: Create Release
+    needs: release
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: ./artifacts
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release_assets
+          find ./artifacts -name "*.tar.gz" -o -name "*.zip" | while read file; do
+            cp "$file" release_assets/
+          done
+          ls -la release_assets/
+
+      - name: Generate checksums
+        run: |
+          cd release_assets
+          sha256sum * > checksums.txt
+          cd ..
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          cat > release_notes.md << 'EOF'
+          ## 🚀 DBSage ${{ steps.version.outputs.VERSION }}
+
+          ### What's New
+          - Database AI Assistant with enhanced features
+          - Support for PostgreSQL and MySQL databases
+          - Advanced query optimization and analysis
+          - Intelligent SQL generation and execution
+          - Performance bottleneck detection
+
+          ### 📦 Installation
+
+          #### One-Click Installation (Recommended)
+
+          **Linux/macOS:**
+          ```bash
+          curl -fsSL https://raw.githubusercontent.com/murongg/dbsage/main/install.sh | bash
+          ```
+
+          **Windows:**
+          ```cmd
+          # Download and run install.bat as administrator
+          ```
+
+          #### Manual Installation
+
+          1. Download the appropriate binary for your system below
+          2. Extract the archive
+          3. Move the binary to your PATH
+          4. Run `dbsage` to start
+
+          ### 📋 Supported Platforms
+
+          - Linux (AMD64, ARM64)
+          - macOS (Intel, Apple Silicon)
+          - Windows (AMD64, ARM64)
+
+          ### 🔧 Requirements
+
+          - Go 1.21+ (for building from source)
+          - OpenAI API Key
+          - Database connection (PostgreSQL or MySQL)
+
+          ### 📝 Configuration
+
+          After installation, edit the configuration file:
+          - Linux/macOS: `~/.dbsage/config.env`
+          - Windows: `%USERPROFILE%\.dbsage\config.env`
+
+          Set your OpenAI API key:
+          ```
+          OPENAI_API_KEY=your_api_key_here
+          ```
+
+          ### 🐛 Bug Reports & Feature Requests
+
+          Please report issues at: https://github.com/murongg/dbsage/issues
+
+          ### 📄 Checksums
+
+          Verify your download with the checksums provided in `checksums.txt`.
+          EOF
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.VERSION }}
+          name: DBSage ${{ steps.version.outputs.VERSION }}
+          body_path: release_notes.md
+          draft: false
+          prerelease: false
+          files: |
+            release_assets/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update latest release info
+        run: |
+          echo "Release ${{ steps.version.outputs.VERSION }} created successfully!"
+          echo "Download URL: https://github.com/murongg/dbsage/releases/tag/${{ steps.version.outputs.VERSION }}"

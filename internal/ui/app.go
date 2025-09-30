@@ -230,7 +230,6 @@ func Run(aiClient *ai.Client, dbTools dbinterfaces.DatabaseInterface, connServic
 
 	p := tea.NewProgram(
 		model,
-		tea.WithMouseCellMotion(),
 	)
 
 	model.SetProgram(p)

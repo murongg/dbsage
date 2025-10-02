@@ -98,22 +98,23 @@ func (c *Client) QueryWithTools(ctx context.Context, messages []openai.ChatCompl
 	message := resp.Choices[0].Message
 
 	if len(message.ToolCalls) > 0 {
-		toolCall := message.ToolCalls[0]
+		// Process all tool calls
+		toolMessages := []openai.ChatCompletionMessage{message}
 
-		result, err := c.toolExecutor.Execute(toolCall)
-		if err != nil {
-			return "", fmt.Errorf("tool execution error: %w", err)
-		}
+		for _, toolCall := range message.ToolCalls {
+			result, err := c.toolExecutor.Execute(toolCall)
+			if err != nil {
+				return "", fmt.Errorf("tool execution error: %w", err)
+			}
 
-		updatedMessages := append(messages,
-			message,
-			openai.ChatCompletionMessage{
+			toolMessages = append(toolMessages, openai.ChatCompletionMessage{
 				Role:       openai.ChatMessageRoleTool,
 				Content:    result,
 				ToolCallID: toolCall.ID,
-			},
-		)
+			})
+		}
 
+		updatedMessages := append(messages, toolMessages...)
 		return c.QueryWithTools(ctx, updatedMessages)
 	}
 
@@ -148,8 +149,11 @@ func (c *Client) QueryWithToolsStreaming(ctx context.Context, messages []openai.
 
 	// If tools are needed, execute them
 	if len(completeMessage.ToolCalls) > 0 {
+		// For streaming with multiple tool calls, we need to handle them sequentially
+		// because confirmation might be needed for some tools
 		toolCall := completeMessage.ToolCalls[0]
-		// Execute the tool with confirmation check
+
+		// Execute the first tool with confirmation check
 		result, err := c.executeToolWithConfirmation(ctx, messages, completeMessage, toolCall, callback)
 		if err != nil {
 			return fmt.Errorf("tool execution error: %w", err)
@@ -162,15 +166,30 @@ func (c *Client) QueryWithToolsStreaming(ctx context.Context, messages []openai.
 			return nil
 		}
 
-		updatedMessages := append(messages,
-			completeMessage,
-			openai.ChatCompletionMessage{
-				Role:       openai.ChatMessageRoleTool,
-				Content:    result,
-				ToolCallID: toolCall.ID,
-			},
-		)
+		// Process all tool calls
+		toolMessages := []openai.ChatCompletionMessage{completeMessage}
 
+		for _, tc := range completeMessage.ToolCalls {
+			var toolResult string
+			if tc.ID == toolCall.ID {
+				// Use the already executed result for the first tool
+				toolResult = result
+			} else {
+				// Execute other tools (they don't need confirmation in this context)
+				toolResult, err = c.toolExecutor.Execute(tc)
+				if err != nil {
+					return fmt.Errorf("tool execution error: %w", err)
+				}
+			}
+
+			toolMessages = append(toolMessages, openai.ChatCompletionMessage{
+				Role:       openai.ChatMessageRoleTool,
+				Content:    toolResult,
+				ToolCallID: tc.ID,
+			})
+		}
+
+		updatedMessages := append(messages, toolMessages...)
 		// Recursively call with updated messages
 		return c.QueryWithToolsStreaming(ctx, updatedMessages, callback)
 	}
@@ -197,15 +216,30 @@ func (c *Client) ContinueWithConfirmedTool(ctx context.Context, messages []opena
 		return fmt.Errorf("tool execution error: %w", err)
 	}
 
-	updatedMessages := append(messages,
-		completeMessage,
-		openai.ChatCompletionMessage{
-			Role:       openai.ChatMessageRoleTool,
-			Content:    result,
-			ToolCallID: toolCall.ID,
-		},
-	)
+	// Process all tool calls
+	toolMessages := []openai.ChatCompletionMessage{completeMessage}
 
+	for _, tc := range completeMessage.ToolCalls {
+		var toolResult string
+		if tc.ID == toolCall.ID {
+			// Use the confirmed tool result
+			toolResult = result
+		} else {
+			// Execute other tools
+			toolResult, err = c.toolExecutor.Execute(tc)
+			if err != nil {
+				return fmt.Errorf("tool execution error: %w", err)
+			}
+		}
+
+		toolMessages = append(toolMessages, openai.ChatCompletionMessage{
+			Role:       openai.ChatMessageRoleTool,
+			Content:    toolResult,
+			ToolCallID: tc.ID,
+		})
+	}
+
+	updatedMessages := append(messages, toolMessages...)
 	// Continue with streaming
 	return c.QueryWithToolsStreaming(ctx, updatedMessages, callback)
 }

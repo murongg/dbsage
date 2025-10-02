@@ -367,12 +367,7 @@ echo # TIMEOUT=30s
 ) > "%CONFIG_DIR%\config.env"
 
 REM Create connection configuration file
-(
-echo {
-echo   "connections": [],
-echo   "current": ""
-echo }
-) > "%CONFIG_DIR%\connections.json"
+echo {}> "%CONFIG_DIR%\connections.json"
 
 echo %GREEN%%SUCCESS% Configuration files created in %CONFIG_DIR%\%NC%
 echo %INFO% Please edit %CONFIG_DIR%\config.env file to set your OpenAI API Key%NC%

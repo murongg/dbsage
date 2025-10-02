@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"dbsage/internal/models"
+	"dbsage/pkg/database"
 	"dbsage/pkg/dbinterfaces"
 )
 
@@ -50,7 +51,10 @@ func (h *CommandHandler) processSlashCommand(input string) (bool, string, error)
 
 	case "/add":
 		if len(args) < 1 {
-			return true, "Usage: /add <connection_name>\nExample: /add mydb", nil
+			return true, "Usage: /add <connection_name> [database_url]\nExample: /add mydb postgres://user:pass@host:5432/db", nil
+		}
+		if len(args) >= 2 {
+			return h.addConnectionWithURL(args[0], args[1])
 		}
 		return h.addConnection(args[0])
 
@@ -156,7 +160,10 @@ func (h *CommandHandler) getHelpMessage() string {
 	return `Available commands:
 
 Database Commands:
-- /add <name>: Add database connection (supports postgresql, mysql)
+- /add <name> [url]: Add database connection (supports postgresql, mysql)
+  Examples: 
+    /add mydb postgres://user:pass@host:5432/db
+    /add mydb (interactive setup)
 - /switch <name>: Switch to connection  
 - /list: List all connections with types
 - /remove <name>: Remove connection
@@ -180,7 +187,38 @@ func (h *CommandHandler) addConnection(name string) (bool, string, error) {
 	}
 
 	// This is a simplified version - in reality you'd need to collect connection details
-	return true, fmt.Sprintf("To add connection '%s', you need to provide:\n- Database type (postgresql, mysql)\n- Host\n- Port\n- Database name\n- Username\n- Password\n\nSupported database types: postgresql, mysql\nUse the interactive setup or configuration file.", name), nil
+	return true, fmt.Sprintf("To add connection '%s', you need to provide:\n- Database type (postgresql, mysql)\n- Host\n- Port\n- Database name\n- Username\n- Password\n\nSupported database types: postgresql, mysql\nUse the interactive setup or configuration file.\n\nAlternatively, use: /add %s <database_url>\nExample: /add %s postgres://user:pass@host:5432/db", name, name, name), nil
+}
+
+// addConnectionWithURL adds a new database connection using a database URL
+func (h *CommandHandler) addConnectionWithURL(name, databaseURL string) (bool, string, error) {
+	if h.connService == nil {
+		return true, "Connection service not available", nil
+	}
+
+	// Validate URL format
+	if !database.ValidateDatabaseURL(databaseURL) {
+		return true, "Invalid database URL format. Supported formats:\n- postgres://user:password@host:port/database\n- postgresql://user:password@host:port/database", nil
+	}
+
+	// Parse the database URL
+	config, err := database.ParseDatabaseURL(databaseURL)
+	if err != nil {
+		return true, fmt.Sprintf("Failed to parse database URL: %v", err), nil
+	}
+
+	// Set the connection name and type
+	config.Name = name
+	config.Type = "postgresql"
+
+	// Add the connection
+	err = h.connService.AddConnection(config)
+	if err != nil {
+		return true, fmt.Sprintf("Failed to add connection '%s': %v", name, err), nil
+	}
+
+	return true, fmt.Sprintf("Successfully added connection '%s'\nHost: %s:%d\nDatabase: %s\nUsername: %s",
+		name, config.Host, config.Port, config.Database, config.Username), nil
 }
 
 // switchConnection switches to a different connection

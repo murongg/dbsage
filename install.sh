@@ -333,10 +333,7 @@ EOF
     
     # Create connection configuration file
     cat > "$CONFIG_DIR/connections.json" << 'EOF'
-{
-  "connections": [],
-  "current": ""
-}
+{}
 EOF
     
     print_success "Configuration files created in $CONFIG_DIR/"

@@ -324,8 +324,8 @@ func (r *ContentRenderer) highlightCommands(text string) string {
 		// DBSage commands (slash commands)
 		{regexp.MustCompile(`'/[a-zA-Z]+'`), "39"}, // '/add', '/help', etc. - cyan
 		// Environment variables
-		{regexp.MustCompile(`'export [A-Z_]+=[^']+'`), "226"}, // 'export OPENAI_API_KEY=...' - yellow
-		{regexp.MustCompile(`'OPENAI_[A-Z_]+=[^']+'`), "226"}, // Direct env vars - yellow
+		{regexp.MustCompile(`'export [A-Z_]+=[^']+'`), "252"}, // 'export OPENAI_API_KEY=...' - default color (will be bold)
+		{regexp.MustCompile(`'OPENAI_[A-Z_]+=[^']+'`), "252"}, // Direct env vars - default color (will be bold)
 		// Keyboard shortcuts
 		{regexp.MustCompile(`'q'`), "208"},           // 'q' key - orange
 		{regexp.MustCompile(`'\?'`), "208"},          // '?' key - orange

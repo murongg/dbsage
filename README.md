@@ -56,16 +56,26 @@ make run
 ## Commands
 
 ```bash
+# Command Line Options
+dbsage --version       # Show version information
+dbsage -v             # Show version information (short)
+dbsage --help         # Show usage help
+
 # Connection Management
 /add test connection   # Add database connection
 /switch production     # Switch database
 /list                  # Show all connections
+/remove test          # Remove connection
+
+# General Commands
+/help                 # Show available commands
+/clear                # Clear screen
+/exit or /quit        # Exit application
 
 # Quick Access
 @                      # Show connections
-@production           # Quick switch
-help                  # Show help
-exit                  # Exit
+@production           # Quick switch to connection
+@<query>              # Execute database query directly
 ```
 
 ## Configuration

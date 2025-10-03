@@ -1,6 +1,6 @@
 # Database AI Assistant - Go Version Makefile
 
-.PHONY: help setup build run clean install dev test test-coverage test-race test-utils test-models test-database test-ai test-ui benchmark benchmark-utils benchmark-ai benchmark-ui lint check fmt release release-patch release-minor release-major
+.PHONY: help setup build run clean install dev test test-coverage test-race test-utils test-models test-database test-ai test-ui benchmark benchmark-utils benchmark-ai benchmark-ui lint check fmt release release-patch release-minor release-major version
 
 # Default target
 help:
@@ -12,6 +12,9 @@ help:
 	@echo "  build     - 🔨 Build the application"
 	@echo "  run       - 🚀 Run the application"
 	@echo "  dev       - 💻 Run in development mode (go run)"
+	@echo ""
+	@echo "Version info:"
+	@echo "  version   - 📋 Show version information"
 	@echo ""
 	@echo "Code quality:"
 	@echo "  lint      - 🔍 Run code quality checks"
@@ -44,14 +47,32 @@ help:
 	@echo "  help      - 📖 Show this help message"
 	@echo ""
 
+# Show version information
+version:
+	@echo "📋 Version Information:"
+	@echo "  Version: $(VERSION)"
+	@echo "  Git Commit: $(GIT_COMMIT)"
+
 # Setup environment
 setup:
 	@./scripts/setup.sh
 
+# Version information
+VERSION ?= $(shell git describe --tags --abbrev=0 2>/dev/null || echo "v0.1.0")
+GIT_COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+
+# Build flags for version injection
+LDFLAGS = -X 'main.Version=$(VERSION)' \
+          -X 'main.GitCommit=$(GIT_COMMIT)' \
+          -X 'dbsage/internal/version.Version=$(VERSION)' \
+          -X 'dbsage/internal/version.GitCommit=$(GIT_COMMIT)'
+
 # Build the application
 build:
 	@echo "🔨 Building dbsage..."
-	@go build -o dbsage cmd/dbsage/main.go
+	@echo "  Version: $(VERSION)"
+	@echo "  Git Commit: $(GIT_COMMIT)"
+	@go build -ldflags "$(LDFLAGS)" -o dbsage cmd/dbsage/main.go
 	@echo "✅ Build complete! Binary: ./dbsage"
 
 # Run the application
@@ -61,7 +82,9 @@ run: build
 # Development mode - run with go run
 dev:
 	@echo "💻 Running in development mode..."
-	@go run cmd/dbsage/main.go
+	@echo "  Version: $(VERSION)"
+	@echo "  Git Commit: $(GIT_COMMIT)"
+	@go run -ldflags "$(LDFLAGS)" cmd/dbsage/main.go
 
 # Install/update dependencies
 install:

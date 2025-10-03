@@ -216,6 +216,7 @@ download_binary() {
     local temp_dir=$1
     local version=$2
     local platform=$3
+    local original_dir=$(pwd)
     
     print_info "Downloading DBSage binary for $platform..."
     
@@ -287,6 +288,9 @@ download_binary() {
     # Make binary executable
     chmod +x "$binary_file"
     
+    # Return to original directory
+    cd "$original_dir"
+    
     print_success "Binary download and extraction completed"
 }
 
@@ -301,6 +305,14 @@ install_binary() {
         source_binary_name="${BINARY_NAME}.exe"
     fi
     local source_binary="$temp_dir/$source_binary_name"
+    
+    # Verify source binary exists
+    if [ ! -f "$source_binary" ]; then
+        print_error "Source binary not found: $source_binary"
+        print_info "Available files in temp directory:"
+        ls -la "$temp_dir"
+        exit 1
+    fi
     
     # Determine target binary name
     local target_binary_name="$BINARY_NAME"
@@ -322,13 +334,17 @@ install_binary() {
         print_success "DBSage installed to $INSTALL_DIR/$target_binary_name"
     else
         print_info "Installing DBSage to current directory..."
-        if [ "$source_binary" != "$(pwd)/$target_binary_name" ]; then
-            cp "$source_binary" "./$target_binary_name"
+        # Remove existing binary if it exists to avoid conflicts
+        rm -f "./$target_binary_name"
+        
+        # Copy binary to current directory
+        if cp "$source_binary" "./$target_binary_name"; then
             chmod +x "./$target_binary_name"
+            print_success "DBSage installed to $(pwd)/$target_binary_name"
         else
-            print_info "Binary already exists at target location"
+            print_error "Failed to install binary to $(pwd)/$target_binary_name"
+            exit 1
         fi
-        print_success "DBSage installed to $(pwd)/$target_binary_name"
     fi
 }
 

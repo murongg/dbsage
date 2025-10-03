@@ -7,6 +7,7 @@ import (
 	"dbsage/internal/ui/handlers"
 	"dbsage/internal/ui/renderers"
 	"dbsage/internal/ui/state"
+	"dbsage/internal/version"
 	"dbsage/pkg/dbinterfaces"
 
 	"github.com/charmbracelet/bubbles/list"
@@ -122,6 +123,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case models.ToolConfirmationResponseMsg:
 		return m.handleToolConfirmationResponse(msg)
+
+	case models.VersionUpdateMsg:
+		return m.handleVersionUpdate(msg)
 	}
 
 	return m, nil
@@ -141,6 +145,12 @@ func (m *Model) View() string {
 	if guidance := m.stateManager.GetCurrentGuidance(); guidance != nil {
 		guidanceContent := m.contentRenderer.RenderGuidance(guidance)
 		contentSections = append(contentSections, guidanceContent)
+	}
+
+	// Version update notification (if available)
+	if versionUpdate := m.stateManager.GetVersionUpdate(); versionUpdate != nil {
+		versionContent := m.contentRenderer.RenderVersionUpdate(versionUpdate)
+		contentSections = append(contentSections, versionContent)
 	}
 
 	// Help information (if needed)
@@ -241,6 +251,9 @@ func Run(aiClient *ai.Client, dbTools dbinterfaces.DatabaseInterface, connServic
 	)
 
 	model.SetProgram(p)
+
+	// Start version checking service with the program reference
+	version.StartVersionService(p)
 
 	_, err := p.Run()
 	return err

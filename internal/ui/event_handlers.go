@@ -61,6 +61,11 @@ func (m *Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.stateManager.DismissGuidance()
 			return m, nil
 		}
+		// Dismiss version update notification if it's currently shown
+		if m.stateManager.GetVersionUpdate() != nil {
+			m.stateManager.DismissVersionUpdate()
+			return m, nil
+		}
 		return m, nil
 
 	case "tab":
@@ -437,4 +442,10 @@ func (m *Model) handleToolConfirmationFromAI(ctx context.Context, messages []ope
 	}
 
 	return true, nil
+}
+
+// handleVersionUpdate handles version update notifications
+func (m *Model) handleVersionUpdate(msg models.VersionUpdateMsg) (tea.Model, tea.Cmd) {
+	m.stateManager.SetVersionUpdate(msg.UpdateInfo)
+	return m, nil
 }

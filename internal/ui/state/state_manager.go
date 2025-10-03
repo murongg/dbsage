@@ -34,6 +34,8 @@ type StateManager struct {
 	// Guidance fields
 	currentGuidance *models.GuidanceInfo
 	hasApiKey       bool
+	// Version update fields
+	versionUpdate *models.VersionUpdateInfo
 }
 
 // NewStateManager creates a new state manager
@@ -342,4 +344,17 @@ func (sm *StateManager) UpdateDatabaseTools(dbTools dbinterfaces.DatabaseInterfa
 func (sm *StateManager) RefreshGuidance() {
 	// Re-check guidance state (useful after connection changes)
 	sm.checkAndSetInitialGuidance()
+}
+
+// Version update management
+func (sm *StateManager) GetVersionUpdate() *models.VersionUpdateInfo {
+	return sm.versionUpdate
+}
+
+func (sm *StateManager) SetVersionUpdate(updateInfo *models.VersionUpdateInfo) {
+	sm.versionUpdate = updateInfo
+}
+
+func (sm *StateManager) DismissVersionUpdate() {
+	sm.versionUpdate = nil
 }

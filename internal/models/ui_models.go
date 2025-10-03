@@ -102,3 +102,17 @@ type GuidanceInfo struct {
 type GuidanceMsg struct {
 	GuidanceInfo *GuidanceInfo
 }
+
+// VersionUpdateInfo contains information about available version updates
+type VersionUpdateInfo struct {
+	HasUpdate      bool   `json:"has_update"`
+	CurrentVersion string `json:"current_version"`
+	LatestVersion  string `json:"latest_version"`
+	ReleaseURL     string `json:"release_url"`
+	ReleaseNotes   string `json:"release_notes"`
+}
+
+// VersionUpdateMsg is sent when a version update is available
+type VersionUpdateMsg struct {
+	UpdateInfo *VersionUpdateInfo
+}

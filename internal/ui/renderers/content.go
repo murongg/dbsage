@@ -347,3 +347,74 @@ func (r *ContentRenderer) highlightCommands(text string) string {
 
 	return result
 }
+
+// RenderVersionUpdate renders version update notification
+func (r *ContentRenderer) RenderVersionUpdate(updateInfo *models.VersionUpdateInfo) string {
+	if updateInfo == nil || !updateInfo.HasUpdate {
+		return ""
+	}
+
+	// Title with icon
+	title := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("46")).
+		Bold(true).
+		Width(r.width - 4).
+		Render("🚀 New Version Available!")
+
+	// Version information
+	versionInfo := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("252")).
+		Width(r.width - 4).
+		Render(fmt.Sprintf("Current: %s → Latest: %s", updateInfo.CurrentVersion, updateInfo.LatestVersion))
+
+	// Release URL
+	releaseURL := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("39")).
+		Underline(true).
+		Width(r.width - 4).
+		Render(updateInfo.ReleaseURL)
+
+	var sections []string
+	sections = append(sections, title, "", versionInfo, "", releaseURL)
+
+	// Release notes if available
+	if updateInfo.ReleaseNotes != "" {
+		notesTitle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("214")).
+			Bold(true).
+			Width(r.width - 4).
+			Render("Release Notes:")
+
+		// Truncate release notes if too long
+		notes := updateInfo.ReleaseNotes
+		if len(notes) > 200 {
+			notes = notes[:200] + "..."
+		}
+
+		notesContent := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("240")).
+			Width(r.width - 4).
+			Render(notes)
+
+		sections = append(sections, "", notesTitle, notesContent)
+	}
+
+	// Instructions
+	instructions := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("240")).
+		Width(r.width - 4).
+		Render("Visit the link above to download the latest version.")
+
+	sections = append(sections, "", instructions)
+
+	// Add border around the notification
+	content := strings.Join(sections, "\n")
+
+	boxStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("46")).
+		Padding(1, 2).
+		Width(r.width - 2)
+
+	return boxStyle.Render(content)
+}

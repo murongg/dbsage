@@ -66,8 +66,14 @@ func main() {
 		})
 	}
 
+	// Initialize version checking service
+	version.InitVersionService()
+
 	// Run Bubble Tea TUI - it will handle the case when apiKey is empty
 	if err := ui.Run(openaiClient, dbTools, connService); err != nil {
 		log.Fatalf("TUI error: %v", err)
 	}
+
+	// Stop version checking service when app exits
+	version.StopVersionService()
 }

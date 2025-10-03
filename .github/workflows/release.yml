@@ -95,12 +95,95 @@ jobs:
                    -o "dist/${binary_name}" \
                    ./cmd/dbsage/main.go
           
+          # Create platform-specific README
+          cat > dist/README.md << 'EOF'
+          # DBSage - Database AI Assistant
+          
+          An intelligent database management tool that brings AI-powered assistance to your database operations.
+          
+          ## Installation
+          
+          This directory contains the pre-compiled binary for your platform. You can either:
+          
+          ### Option 1: Use the One-Click Installer (Recommended)
+          
+          #### Global Installation
+          ```bash
+          # Linux / macOS - Install to /usr/local/bin (requires sudo)
+          curl -fsSL https://raw.githubusercontent.com/murongg/dbsage/main/install.sh | sudo bash
+          ```
+          
+          #### Local Installation
+          ```bash
+          # Linux / macOS - Install to current directory (no sudo required)
+          curl -fsSL https://raw.githubusercontent.com/murongg/dbsage/main/install.sh | bash -s -- --local
+          ```
+          
+          ### Option 2: Manual Installation
+          
+          1. **Extract the binary**
+             ```bash
+             # For .tar.gz files (Linux/macOS)
+             tar -xzf dbsage_*.tar.gz
+             
+             # For .zip files (Windows)
+             unzip dbsage_*.zip
+             ```
+          
+          2. **Make executable and move to PATH** (Linux/macOS)
+             ```bash
+             chmod +x dbsage
+             sudo mv dbsage /usr/local/bin/
+             ```
+          
+          3. **Verify installation**
+             ```bash
+             dbsage --version
+             ```
+          
+          ## Quick Start
+          
+          1. **Configure API Key**
+             ```bash
+             # Create config directory
+             mkdir -p ~/.dbsage
+             
+             # Edit configuration
+             nano ~/.dbsage/config.env
+             # Set: OPENAI_API_KEY=your_api_key_here
+             ```
+          
+          2. **Launch DBSage**
+             ```bash
+             dbsage
+             ```
+          
+          3. **Add Database Connection**
+             ```bash
+             /add mydb
+             # Follow prompts to enter database details
+             ```
+          
+          ## Features
+          
+          - **🧠 AI-Powered**: Convert natural language queries into optimized SQL
+          - **🛡️ Safety First**: Built-in protection against dangerous operations 
+          - **🔌 Multi-Database**: Support for PostgreSQL, MySQL, and SQLite
+          - **💻 Cross-Platform**: Works on Linux, macOS, and Windows
+          
+          ## Links
+          
+          - **Documentation**: [GitHub Repository](https://github.com/murongg/dbsage)
+          - **Issues**: [GitHub Issues](https://github.com/murongg/dbsage/issues)
+          - **Releases**: [GitHub Releases](https://github.com/murongg/dbsage/releases)
+          EOF
+          
           # Create archive
           cd dist
           if [ "${{ matrix.goos }}" = "windows" ]; then
-            zip "../dbsage_${{ matrix.archive_suffix }}" "${binary_name}" ../README.md ../LICENSE || true
+            zip "../dbsage_${{ matrix.archive_suffix }}" "${binary_name}" README.md || true
           else
-            tar -czf "../dbsage_${{ matrix.archive_suffix }}" "${binary_name}" ../README.md ../LICENSE || true
+            tar -czf "../dbsage_${{ matrix.archive_suffix }}" "${binary_name}" README.md || true
           fi
           cd ..
 
@@ -175,9 +258,14 @@ jobs:
 
           #### One-Click Installation (Recommended)
 
-          **Linux/macOS:**
+          **Global Installation (Linux/macOS):**
           ```bash
-          curl -fsSL https://raw.githubusercontent.com/murongg/dbsage/main/install.sh | bash
+          curl -fsSL https://raw.githubusercontent.com/murongg/dbsage/main/install.sh | sudo bash
+          ```
+
+          **Local Installation (Linux/macOS):**
+          ```bash
+          curl -fsSL https://raw.githubusercontent.com/murongg/dbsage/main/install.sh | bash -s -- --local
           ```
 
           **Windows:**

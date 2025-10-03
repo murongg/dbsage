@@ -12,11 +12,33 @@ An intelligent database management tool that brings AI-powered assistance to you
 ## Installation
 
 ### Quick Install
+
+#### Global Installation (Recommended)
 ```bash
-# Linux / macOS
-curl -fsSL https://raw.githubusercontent.com/murongg/dbsage/main/install.sh | bash
+# Linux / macOS - Install to /usr/local/bin (requires sudo)
+curl -fsSL https://raw.githubusercontent.com/murongg/dbsage/main/install.sh | sudo bash
 
 # Windows: Download install.bat and run as administrator
+```
+
+#### Local Installation
+```bash
+# Linux / macOS - Install to current directory (no sudo required)
+curl -fsSL https://raw.githubusercontent.com/murongg/dbsage/main/install.sh | bash -s -- --local
+
+# Run with ./dbsage in the installation directory
+```
+
+#### Installation Options
+```bash
+# Force reinstallation
+curl -fsSL https://raw.githubusercontent.com/murongg/dbsage/main/install.sh | sudo bash -s -- --force
+
+# Install to custom directory
+curl -fsSL https://raw.githubusercontent.com/murongg/dbsage/main/install.sh | sudo bash -s -- --dir /opt/bin
+
+# Show help
+curl -fsSL https://raw.githubusercontent.com/murongg/dbsage/main/install.sh | bash -s -- --help
 ```
 
 ### Manual Install

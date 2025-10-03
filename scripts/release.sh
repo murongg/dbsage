@@ -267,8 +267,9 @@ show_summary() {
     echo -e "${GREEN}🚀 Monitor the GitHub Action at: https://github.com/$REPO_NAME/actions${NC}"
     echo ""
     echo -e "${YELLOW}Installation commands for users:${NC}"
-    echo "• ${CYAN}Linux/macOS:${NC} curl -fsSL https://raw.githubusercontent.com/$REPO_NAME/main/install.sh | bash"
-    echo "• ${CYAN}Windows:${NC} Download and run install.bat"
+    echo "• ${CYAN}Global (Linux/macOS):${NC} curl -fsSL https://raw.githubusercontent.com/$REPO_NAME/main/install.sh | sudo bash"
+    echo "• ${CYAN}Local (Linux/macOS):${NC} curl -fsSL https://raw.githubusercontent.com/$REPO_NAME/main/install.sh | bash -s -- --local"
+    echo "• ${CYAN}Windows:${NC} Download and run install.bat as administrator"
     echo ""
 }
 

@@ -7,8 +7,9 @@
 # Supported Architecture: amd64, arm64
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/murongg/dbsage/main/install.sh | bash
-#   or download and run: bash install.sh
+#   Global install:   curl -fsSL https://raw.githubusercontent.com/murongg/dbsage/main/install.sh | sudo bash
+#   Local install:    curl -fsSL https://raw.githubusercontent.com/murongg/dbsage/main/install.sh | bash -s -- --local
+#   Manual download:  curl -O https://raw.githubusercontent.com/murongg/dbsage/main/install.sh && bash install.sh
 
 set -e
 

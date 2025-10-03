@@ -147,10 +147,13 @@ If builds fail:
 Test the installation scripts after each release:
 
 ```bash
-# Test Linux/macOS
-curl -fsSL https://raw.githubusercontent.com/murongg/dbsage/main/install.sh | bash
+# Test global installation (Linux/macOS)
+curl -fsSL https://raw.githubusercontent.com/murongg/dbsage/main/install.sh | sudo bash
 
-# Test Windows (in PowerShell)
+# Test local installation (Linux/macOS)
+curl -fsSL https://raw.githubusercontent.com/murongg/dbsage/main/install.sh | bash -s -- --local
+
+# Test Windows (in PowerShell as Administrator)
 # Download and run install.bat
 ```
 

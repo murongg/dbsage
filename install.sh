@@ -587,7 +587,7 @@ main() {
     fi
 }
 
-# Check if running as script
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+# Check if running as script (handle both direct execution and piped execution)
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]] || [[ -z "${BASH_SOURCE[0]}" ]]; then
     main "$@"
 fi

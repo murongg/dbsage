@@ -54,18 +54,8 @@ func (e *Executor) Execute(toolCall openai.ToolCall) (string, error) {
 		return e.explainQuery(dbTools, args)
 	case "get_table_indexes":
 		return e.getTableIndexes(dbTools, args)
-	case "get_table_stats":
-		return e.getTableStats(dbTools, args)
 	case "find_duplicate_data":
 		return e.findDuplicateData(dbTools, args)
-	case "get_slow_queries":
-		return e.getSlowQueries(dbTools)
-	case "get_database_size":
-		return e.getDatabaseSize(dbTools)
-	case "get_table_sizes":
-		return e.getTableSizes(dbTools)
-	case "get_active_connections":
-		return e.getActiveConnections(dbTools)
 	default:
 		return "", fmt.Errorf("unknown tool: %s", toolCall.Function.Name)
 	}
@@ -147,22 +137,6 @@ func (e *Executor) getTableIndexes(dbTools dbinterfaces.DatabaseInterface, args 
 	return string(resultJSON), nil
 }
 
-func (e *Executor) getTableStats(dbTools dbinterfaces.DatabaseInterface, args map[string]interface{}) (string, error) {
-	tableName, ok := args["tableName"].(string)
-	if !ok {
-		return "", fmt.Errorf("tableName argument is required and must be a string")
-	}
-	stats, err := dbTools.GetTableStats(tableName)
-	if err != nil {
-		return "", err
-	}
-	resultJSON, err := json.Marshal(stats)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal stats: %w", err)
-	}
-	return string(resultJSON), nil
-}
-
 func (e *Executor) findDuplicateData(dbTools dbinterfaces.DatabaseInterface, args map[string]interface{}) (string, error) {
 	tableName, ok := args["tableName"].(string)
 	if !ok {
@@ -185,54 +159,6 @@ func (e *Executor) findDuplicateData(dbTools dbinterfaces.DatabaseInterface, arg
 	resultJSON, err := json.Marshal(result)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal duplicate result: %w", err)
-	}
-	return string(resultJSON), nil
-}
-
-func (e *Executor) getSlowQueries(dbTools dbinterfaces.DatabaseInterface) (string, error) {
-	queries, err := dbTools.GetSlowQueries()
-	if err != nil {
-		return "", err
-	}
-	resultJSON, err := json.Marshal(queries)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal queries: %w", err)
-	}
-	return string(resultJSON), nil
-}
-
-func (e *Executor) getDatabaseSize(dbTools dbinterfaces.DatabaseInterface) (string, error) {
-	size, err := dbTools.GetDatabaseSize()
-	if err != nil {
-		return "", err
-	}
-	resultJSON, err := json.Marshal(size)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal size: %w", err)
-	}
-	return string(resultJSON), nil
-}
-
-func (e *Executor) getTableSizes(dbTools dbinterfaces.DatabaseInterface) (string, error) {
-	sizes, err := dbTools.GetTableSizes()
-	if err != nil {
-		return "", err
-	}
-	resultJSON, err := json.Marshal(sizes)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal sizes: %w", err)
-	}
-	return string(resultJSON), nil
-}
-
-func (e *Executor) getActiveConnections(dbTools dbinterfaces.DatabaseInterface) (string, error) {
-	connections, err := dbTools.GetActiveConnections()
-	if err != nil {
-		return "", err
-	}
-	resultJSON, err := json.Marshal(connections)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal connections: %w", err)
 	}
 	return string(resultJSON), nil
 }

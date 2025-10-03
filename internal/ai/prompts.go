@@ -43,12 +43,7 @@ Available tools:
 - get_table_schema: Get column details for a table
 - explain_query: Analyze query performance with EXPLAIN ANALYZE
 - get_table_indexes: Get all indexes for a specific table
-- get_table_stats: Get statistical information about table columns
 - find_duplicate_data: Find duplicate records in a table based on specified columns
-- get_slow_queries: Get the slowest queries from pg_stat_statements
-- get_database_size: Get the size of the current database
-- get_table_sizes: Get sizes of all tables including table and index sizes
-- get_active_connections: Get information about active database connections
 
 You can use multiple tools in sequence. For example:
 1. Use get_all_tables to explore database structure

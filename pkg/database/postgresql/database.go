@@ -7,7 +7,6 @@ import (
 
 	"dbsage/internal/models"
 	"dbsage/pkg/database/postgresql/queries"
-	"dbsage/pkg/database/postgresql/stats"
 	"dbsage/pkg/dbinterfaces"
 
 	_ "github.com/lib/pq"
@@ -15,10 +14,8 @@ import (
 
 // PostgreSQLDatabase implements the DatabaseInterface for PostgreSQL
 type PostgreSQLDatabase struct {
-	db                     *sql.DB
-	queryExecutor          dbinterfaces.QueryExecutorInterface
-	tableStatsCollector    dbinterfaces.TableStatsCollectorInterface
-	databaseStatsCollector dbinterfaces.DatabaseStatsCollectorInterface
+	db            *sql.DB
+	queryExecutor dbinterfaces.QueryExecutorInterface
 }
 
 // Ensure PostgreSQLDatabase implements DatabaseInterface
@@ -37,10 +34,8 @@ func NewPostgreSQLDatabase(connectionURL string) (*PostgreSQLDatabase, error) {
 	}
 
 	return &PostgreSQLDatabase{
-		db:                     db,
-		queryExecutor:          queries.NewPostgreSQLExecutor(db),
-		tableStatsCollector:    stats.NewPostgreSQLTableStatsCollector(db),
-		databaseStatsCollector: stats.NewPostgreSQLDatabaseStatsCollector(db),
+		db:            db,
+		queryExecutor: queries.NewPostgreSQLExecutor(db),
 	}, nil
 }
 
@@ -259,29 +254,4 @@ func (pg *PostgreSQLDatabase) FindDuplicateData(tableName string, columns []stri
 	`, columnList, tableName, columnList)
 
 	return pg.queryExecutor.ExecuteSQL(query)
-}
-
-// GetTableStats returns statistics for a table
-func (pg *PostgreSQLDatabase) GetTableStats(tableName string) (*models.TableStats, error) {
-	return pg.tableStatsCollector.GetTableStats(tableName)
-}
-
-// GetTableSizes returns size information for all tables
-func (pg *PostgreSQLDatabase) GetTableSizes() ([]map[string]interface{}, error) {
-	return pg.tableStatsCollector.GetTableSizes()
-}
-
-// GetSlowQueries returns slow query information
-func (pg *PostgreSQLDatabase) GetSlowQueries() ([]models.SlowQuery, error) {
-	return pg.tableStatsCollector.GetSlowQueries()
-}
-
-// GetDatabaseSize returns database size information
-func (pg *PostgreSQLDatabase) GetDatabaseSize() (*models.DatabaseSize, error) {
-	return pg.databaseStatsCollector.GetDatabaseSize()
-}
-
-// GetActiveConnections returns active connection information
-func (pg *PostgreSQLDatabase) GetActiveConnections() ([]models.ActiveConnection, error) {
-	return pg.databaseStatsCollector.GetActiveConnections()
 }

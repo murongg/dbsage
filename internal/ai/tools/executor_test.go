@@ -64,31 +64,6 @@ func (m *MockDatabaseInterface) FindDuplicateData(tableName string, columns []st
 	return args.Get(0).(*models.QueryResult), args.Error(1)
 }
 
-func (m *MockDatabaseInterface) GetTableStats(tableName string) (*models.TableStats, error) {
-	args := m.Called(tableName)
-	return args.Get(0).(*models.TableStats), args.Error(1)
-}
-
-func (m *MockDatabaseInterface) GetTableSizes() ([]map[string]interface{}, error) {
-	args := m.Called()
-	return args.Get(0).([]map[string]interface{}), args.Error(1)
-}
-
-func (m *MockDatabaseInterface) GetSlowQueries() ([]models.SlowQuery, error) {
-	args := m.Called()
-	return args.Get(0).([]models.SlowQuery), args.Error(1)
-}
-
-func (m *MockDatabaseInterface) GetDatabaseSize() (*models.DatabaseSize, error) {
-	args := m.Called()
-	return args.Get(0).(*models.DatabaseSize), args.Error(1)
-}
-
-func (m *MockDatabaseInterface) GetActiveConnections() ([]models.ActiveConnection, error) {
-	args := m.Called()
-	return args.Get(0).([]models.ActiveConnection), args.Error(1)
-}
-
 func TestNewExecutor(t *testing.T) {
 	mockDB := &MockDatabaseInterface{}
 	executor := NewExecutor(mockDB)
@@ -373,95 +348,6 @@ func TestExecutor_FindDuplicateData_MissingColumns(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "columns argument is required")
 	assert.Empty(t, result)
-}
-
-func TestExecutor_GetSlowQueries(t *testing.T) {
-	mockDB := &MockDatabaseInterface{}
-	executor := NewExecutor(mockDB)
-
-	expectedQueries := []models.SlowQuery{
-		{Query: "SELECT * FROM large_table", Calls: 100, TotalTime: 5000.0, MeanTime: 50.0},
-	}
-
-	mockDB.On("GetSlowQueries").Return(expectedQueries, nil)
-
-	toolCall := openai.ToolCall{
-		Function: openai.FunctionCall{
-			Name:      "get_slow_queries",
-			Arguments: `{}`,
-		},
-	}
-
-	result, err := executor.Execute(toolCall)
-	require.NoError(t, err)
-
-	var queries []models.SlowQuery
-	err = json.Unmarshal([]byte(result), &queries)
-	require.NoError(t, err)
-	assert.Equal(t, expectedQueries, queries)
-
-	mockDB.AssertExpectations(t)
-}
-
-func TestExecutor_GetDatabaseSize(t *testing.T) {
-	mockDB := &MockDatabaseInterface{}
-	executor := NewExecutor(mockDB)
-
-	expectedSize := &models.DatabaseSize{
-		DatabaseName: "testdb",
-		Size:         "1.5 GB",
-		SizeBytes:    1610612736,
-	}
-
-	mockDB.On("GetDatabaseSize").Return(expectedSize, nil)
-
-	toolCall := openai.ToolCall{
-		Function: openai.FunctionCall{
-			Name:      "get_database_size",
-			Arguments: `{}`,
-		},
-	}
-
-	result, err := executor.Execute(toolCall)
-	require.NoError(t, err)
-
-	var dbSize models.DatabaseSize
-	err = json.Unmarshal([]byte(result), &dbSize)
-	require.NoError(t, err)
-	assert.Equal(t, expectedSize.DatabaseName, dbSize.DatabaseName)
-	assert.Equal(t, expectedSize.Size, dbSize.Size)
-	assert.Equal(t, expectedSize.SizeBytes, dbSize.SizeBytes)
-
-	mockDB.AssertExpectations(t)
-}
-
-func TestExecutor_GetTableSizes(t *testing.T) {
-	mockDB := &MockDatabaseInterface{}
-	executor := NewExecutor(mockDB)
-
-	expectedSizes := []map[string]interface{}{
-		{"table_name": "users", "size": "64 MB"},
-		{"table_name": "orders", "size": "32 MB"},
-	}
-
-	mockDB.On("GetTableSizes").Return(expectedSizes, nil)
-
-	toolCall := openai.ToolCall{
-		Function: openai.FunctionCall{
-			Name:      "get_table_sizes",
-			Arguments: `{}`,
-		},
-	}
-
-	result, err := executor.Execute(toolCall)
-	require.NoError(t, err)
-
-	var sizes []map[string]interface{}
-	err = json.Unmarshal([]byte(result), &sizes)
-	require.NoError(t, err)
-	assert.Equal(t, expectedSizes, sizes)
-
-	mockDB.AssertExpectations(t)
 }
 
 // Benchmark tests

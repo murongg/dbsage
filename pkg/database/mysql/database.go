@@ -7,7 +7,6 @@ import (
 
 	"dbsage/internal/models"
 	"dbsage/pkg/database/mysql/queries"
-	"dbsage/pkg/database/mysql/stats"
 	"dbsage/pkg/dbinterfaces"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -15,10 +14,8 @@ import (
 
 // MySQLDatabase implements the DatabaseInterface for MySQL
 type MySQLDatabase struct {
-	db                     *sql.DB
-	queryExecutor          dbinterfaces.QueryExecutorInterface
-	tableStatsCollector    dbinterfaces.TableStatsCollectorInterface
-	databaseStatsCollector dbinterfaces.DatabaseStatsCollectorInterface
+	db            *sql.DB
+	queryExecutor dbinterfaces.QueryExecutorInterface
 }
 
 // Ensure MySQLDatabase implements DatabaseInterface
@@ -37,10 +34,8 @@ func NewMySQLDatabase(connectionURL string) (*MySQLDatabase, error) {
 	}
 
 	return &MySQLDatabase{
-		db:                     db,
-		queryExecutor:          queries.NewMySQLExecutor(db),
-		tableStatsCollector:    stats.NewMySQLTableStatsCollector(db),
-		databaseStatsCollector: stats.NewMySQLDatabaseStatsCollector(db),
+		db:            db,
+		queryExecutor: queries.NewMySQLExecutor(db),
 	}, nil
 }
 
@@ -234,29 +229,4 @@ func (m *MySQLDatabase) FindDuplicateData(tableName string, columns []string) (*
 	`, columnList, tableName, columnList)
 
 	return m.queryExecutor.ExecuteSQL(query)
-}
-
-// GetTableStats returns statistics for a table
-func (m *MySQLDatabase) GetTableStats(tableName string) (*models.TableStats, error) {
-	return m.tableStatsCollector.GetTableStats(tableName)
-}
-
-// GetTableSizes returns size information for all tables
-func (m *MySQLDatabase) GetTableSizes() ([]map[string]interface{}, error) {
-	return m.tableStatsCollector.GetTableSizes()
-}
-
-// GetSlowQueries returns slow query information
-func (m *MySQLDatabase) GetSlowQueries() ([]models.SlowQuery, error) {
-	return m.tableStatsCollector.GetSlowQueries()
-}
-
-// GetDatabaseSize returns database size information
-func (m *MySQLDatabase) GetDatabaseSize() (*models.DatabaseSize, error) {
-	return m.databaseStatsCollector.GetDatabaseSize()
-}
-
-// GetActiveConnections returns active connection information
-func (m *MySQLDatabase) GetActiveConnections() ([]models.ActiveConnection, error) {
-	return m.databaseStatsCollector.GetActiveConnections()
 }

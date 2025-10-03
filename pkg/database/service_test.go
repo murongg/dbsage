@@ -62,31 +62,6 @@ func (m *MockDatabaseInterface) FindDuplicateData(tableName string, columns []st
 	return args.Get(0).(*models.QueryResult), args.Error(1)
 }
 
-func (m *MockDatabaseInterface) GetTableStats(tableName string) (*models.TableStats, error) {
-	args := m.Called(tableName)
-	return args.Get(0).(*models.TableStats), args.Error(1)
-}
-
-func (m *MockDatabaseInterface) GetTableSizes() ([]map[string]interface{}, error) {
-	args := m.Called()
-	return args.Get(0).([]map[string]interface{}), args.Error(1)
-}
-
-func (m *MockDatabaseInterface) GetSlowQueries() ([]models.SlowQuery, error) {
-	args := m.Called()
-	return args.Get(0).([]models.SlowQuery), args.Error(1)
-}
-
-func (m *MockDatabaseInterface) GetDatabaseSize() (*models.DatabaseSize, error) {
-	args := m.Called()
-	return args.Get(0).(*models.DatabaseSize), args.Error(1)
-}
-
-func (m *MockDatabaseInterface) GetActiveConnections() ([]models.ActiveConnection, error) {
-	args := m.Called()
-	return args.Get(0).([]models.ActiveConnection), args.Error(1)
-}
-
 // MockConnectionManager is a mock implementation of ConnectionManagerInterface
 type MockConnectionManager struct {
 	mock.Mock

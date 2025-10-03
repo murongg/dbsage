@@ -7,7 +7,6 @@ import (
 
 	"dbsage/internal/models"
 	"dbsage/pkg/database/sqlite/queries"
-	"dbsage/pkg/database/sqlite/stats"
 	"dbsage/pkg/dbinterfaces"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -15,10 +14,8 @@ import (
 
 // SQLiteDatabase implements the DatabaseInterface for SQLite
 type SQLiteDatabase struct {
-	db                     *sql.DB
-	queryExecutor          dbinterfaces.QueryExecutorInterface
-	tableStatsCollector    dbinterfaces.TableStatsCollectorInterface
-	databaseStatsCollector dbinterfaces.DatabaseStatsCollectorInterface
+	db            *sql.DB
+	queryExecutor dbinterfaces.QueryExecutorInterface
 }
 
 // Ensure SQLiteDatabase implements DatabaseInterface
@@ -37,10 +34,8 @@ func NewSQLiteDatabase(connectionURL string) (*SQLiteDatabase, error) {
 	}
 
 	return &SQLiteDatabase{
-		db:                     db,
-		queryExecutor:          queries.NewSQLiteExecutor(db),
-		tableStatsCollector:    stats.NewSQLiteTableStatsCollector(db),
-		databaseStatsCollector: stats.NewSQLiteDatabaseStatsCollector(db),
+		db:            db,
+		queryExecutor: queries.NewSQLiteExecutor(db),
 	}, nil
 }
 
@@ -255,29 +250,4 @@ func (s *SQLiteDatabase) FindDuplicateData(tableName string, columns []string) (
 	`, columnList, tableName, columnList)
 
 	return s.queryExecutor.ExecuteSQL(query)
-}
-
-// GetTableStats returns statistics for a table
-func (s *SQLiteDatabase) GetTableStats(tableName string) (*models.TableStats, error) {
-	return s.tableStatsCollector.GetTableStats(tableName)
-}
-
-// GetTableSizes returns size information for all tables
-func (s *SQLiteDatabase) GetTableSizes() ([]map[string]interface{}, error) {
-	return s.tableStatsCollector.GetTableSizes()
-}
-
-// GetSlowQueries returns slow query information (limited in SQLite)
-func (s *SQLiteDatabase) GetSlowQueries() ([]models.SlowQuery, error) {
-	return s.tableStatsCollector.GetSlowQueries()
-}
-
-// GetDatabaseSize returns database size information
-func (s *SQLiteDatabase) GetDatabaseSize() (*models.DatabaseSize, error) {
-	return s.databaseStatsCollector.GetDatabaseSize()
-}
-
-// GetActiveConnections returns active connection information
-func (s *SQLiteDatabase) GetActiveConnections() ([]models.ActiveConnection, error) {
-	return s.databaseStatsCollector.GetActiveConnections()
 }

@@ -78,7 +78,7 @@ func TestToolConfirmationConfig_CheckRequiresConfirmation(t *testing.T) {
 			"get_table_schema":    false,
 			"explain_query":       true,
 			"get_table_indexes":   false,
-			"get_table_stats":     false,
+			"":                    false,
 			"find_duplicate_data": true,
 		},
 	}
@@ -92,7 +92,7 @@ func TestToolConfirmationConfig_CheckRequiresConfirmation(t *testing.T) {
 	assert.False(t, config.RequiresConfirmation["get_all_tables"])
 	assert.False(t, config.RequiresConfirmation["get_table_schema"])
 	assert.False(t, config.RequiresConfirmation["get_table_indexes"])
-	assert.False(t, config.RequiresConfirmation["get_table_stats"])
+	assert.False(t, config.RequiresConfirmation[""])
 
 	// Test non-existent tool (should return false)
 	assert.False(t, config.RequiresConfirmation["non_existent_tool"])
@@ -106,7 +106,7 @@ func TestToolConfirmationConfig_RiskLevels(t *testing.T) {
 			"find_duplicate_data": "medium",
 			"get_all_tables":      "low",
 			"get_table_schema":    "low",
-			"get_table_stats":     "low",
+			"":                    "low",
 		},
 	}
 
@@ -120,7 +120,7 @@ func TestToolConfirmationConfig_RiskLevels(t *testing.T) {
 	// Test low risk tools
 	assert.Equal(t, "low", config.RiskLevels["get_all_tables"])
 	assert.Equal(t, "low", config.RiskLevels["get_table_schema"])
-	assert.Equal(t, "low", config.RiskLevels["get_table_stats"])
+	assert.Equal(t, "low", config.RiskLevels[""])
 
 	// Test non-existent tool
 	assert.Equal(t, "", config.RiskLevels["non_existent_tool"])
@@ -153,7 +153,7 @@ func TestToolConfirmationConfig_CompleteExample(t *testing.T) {
 			"find_duplicate_data": true,
 			"get_all_tables":      false,
 			"get_table_schema":    false,
-			"get_table_stats":     false,
+			"":                    false,
 		},
 		map[string]string{
 			"execute_sql":         "high",
@@ -161,7 +161,7 @@ func TestToolConfirmationConfig_CompleteExample(t *testing.T) {
 			"find_duplicate_data": "medium",
 			"get_all_tables":      "low",
 			"get_table_schema":    "low",
-			"get_table_stats":     "low",
+			"":                    "low",
 		},
 		map[string]string{
 			"execute_sql":         "Executes arbitrary SQL queries - can modify data",
@@ -169,7 +169,7 @@ func TestToolConfirmationConfig_CompleteExample(t *testing.T) {
 			"find_duplicate_data": "Searches for duplicate records - read-only but resource intensive",
 			"get_all_tables":      "Lists database tables - safe read-only operation",
 			"get_table_schema":    "Shows table structure - safe read-only operation",
-			"get_table_stats":     "Shows table statistics - safe read-only operation",
+			"":                    "Shows table statistics - safe read-only operation",
 		},
 	)
 

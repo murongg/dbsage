@@ -23,22 +23,8 @@ type Client struct {
 	toolConfirmConfig   *ToolConfirmationConfig
 }
 
-func NewClient(apiKey, baseURL string, dbTools dbinterfaces.DatabaseInterface) *Client {
-	config := openai.DefaultConfig(apiKey)
-	if baseURL != "" {
-		config.BaseURL = baseURL
-	}
-
-	client := openai.NewClientWithConfig(config)
-	return &Client{
-		client:           client,
-		toolExecutor:     tools.NewExecutor(dbTools),
-		streamingHandler: streaming.NewStreamingHandler(),
-	}
-}
-
-// NewClientWithDynamicTools creates a new client with dynamic database tools getter
-func NewClientWithDynamicTools(apiKey, baseURL string, getDbTools func() dbinterfaces.DatabaseInterface) *Client {
+// NewClient creates a new client with dynamic database tools getter
+func NewClient(apiKey, baseURL string, getDbTools func() dbinterfaces.DatabaseInterface) *Client {
 	config := openai.DefaultConfig(apiKey)
 	if baseURL != "" {
 		config.BaseURL = baseURL
@@ -75,50 +61,6 @@ func (c *Client) executeToolWithConfirmation(ctx context.Context, messages []ope
 
 	// Execute the tool normally
 	return c.toolExecutor.Execute(toolCall)
-}
-
-// QueryWithTools performs a query with tools support (non-streaming)
-func (c *Client) QueryWithTools(ctx context.Context, messages []openai.ChatCompletionMessage) (string, error) {
-	systemMessage := openai.ChatCompletionMessage{
-		Role:    openai.ChatMessageRoleSystem,
-		Content: GetSystemPrompt(),
-	}
-
-	allMessages := append([]openai.ChatCompletionMessage{systemMessage}, messages...)
-
-	resp, err := c.client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
-		Model:    "gpt-4o-mini",
-		Messages: allMessages,
-		Tools:    GetTools(),
-	})
-	if err != nil {
-		return "", fmt.Errorf("OpenAI API error: %w", err)
-	}
-
-	message := resp.Choices[0].Message
-
-	if len(message.ToolCalls) > 0 {
-		// Process all tool calls
-		toolMessages := []openai.ChatCompletionMessage{message}
-
-		for _, toolCall := range message.ToolCalls {
-			result, err := c.toolExecutor.Execute(toolCall)
-			if err != nil {
-				return "", fmt.Errorf("tool execution error: %w", err)
-			}
-
-			toolMessages = append(toolMessages, openai.ChatCompletionMessage{
-				Role:       openai.ChatMessageRoleTool,
-				Content:    result,
-				ToolCallID: toolCall.ID,
-			})
-		}
-
-		updatedMessages := append(messages, toolMessages...)
-		return c.QueryWithTools(ctx, updatedMessages)
-	}
-
-	return message.Content, nil
 }
 
 // QueryWithToolsStreaming performs a streaming query with tools support

@@ -61,7 +61,7 @@ func main() {
 	var openaiClient *ai.Client
 	if apiKey != "" {
 		// Initialize OpenAI client with dynamic database tools
-		openaiClient = ai.NewClientWithDynamicTools(apiKey, baseURL, func() dbinterfaces.DatabaseInterface {
+		openaiClient = ai.NewClient(apiKey, baseURL, func() dbinterfaces.DatabaseInterface {
 			return connService.GetCurrentTools()
 		})
 	}

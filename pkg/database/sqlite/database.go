@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"dbsage/internal/models"
-	"dbsage/pkg/database/sqlite/optimization"
 	"dbsage/pkg/database/sqlite/queries"
 	"dbsage/pkg/database/sqlite/stats"
 	"dbsage/pkg/dbinterfaces"
@@ -20,7 +19,6 @@ type SQLiteDatabase struct {
 	queryExecutor          dbinterfaces.QueryExecutorInterface
 	tableStatsCollector    dbinterfaces.TableStatsCollectorInterface
 	databaseStatsCollector dbinterfaces.DatabaseStatsCollectorInterface
-	queryOptimizer         *optimization.SQLiteQueryOptimizer
 }
 
 // Ensure SQLiteDatabase implements DatabaseInterface
@@ -43,7 +41,6 @@ func NewSQLiteDatabase(connectionURL string) (*SQLiteDatabase, error) {
 		queryExecutor:          queries.NewSQLiteExecutor(db),
 		tableStatsCollector:    stats.NewSQLiteTableStatsCollector(db),
 		databaseStatsCollector: stats.NewSQLiteDatabaseStatsCollector(db),
-		queryOptimizer:         optimization.NewSQLiteQueryOptimizer(db),
 	}, nil
 }
 
@@ -283,31 +280,4 @@ func (s *SQLiteDatabase) GetDatabaseSize() (*models.DatabaseSize, error) {
 // GetActiveConnections returns active connection information
 func (s *SQLiteDatabase) GetActiveConnections() ([]models.ActiveConnection, error) {
 	return s.databaseStatsCollector.GetActiveConnections()
-}
-
-// Query Optimization Methods
-
-// AnalyzeQueryPerformance analyzes the performance of a given query
-func (s *SQLiteDatabase) AnalyzeQueryPerformance(query string) (*models.PerformanceAnalysis, error) {
-	return s.queryOptimizer.AnalyzeQueryPerformance(query)
-}
-
-// SuggestIndexes suggests indexes for a specific table
-func (s *SQLiteDatabase) SuggestIndexes(tableName string) ([]models.IndexSuggestion, error) {
-	return s.queryOptimizer.SuggestIndexes(tableName)
-}
-
-// GetQueryPatterns analyzes query patterns (limited in SQLite)
-func (s *SQLiteDatabase) GetQueryPatterns() ([]models.QueryPattern, error) {
-	return s.queryOptimizer.GetQueryPatterns()
-}
-
-// OptimizeQuery provides optimization suggestions for a specific query
-func (s *SQLiteDatabase) OptimizeQuery(query string) ([]models.QueryOptimizationSuggestion, error) {
-	return s.queryOptimizer.OptimizeQuery(query)
-}
-
-// AnalyzeTablePerformance analyzes performance issues specific to a table
-func (s *SQLiteDatabase) AnalyzeTablePerformance(tableName string) (*models.PerformanceAnalysis, error) {
-	return s.queryOptimizer.AnalyzeTablePerformance(tableName)
 }

@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"dbsage/internal/models"
-	"dbsage/pkg/database/postgresql/optimization"
 	"dbsage/pkg/database/postgresql/queries"
 	"dbsage/pkg/database/postgresql/stats"
 	"dbsage/pkg/dbinterfaces"
@@ -20,7 +19,6 @@ type PostgreSQLDatabase struct {
 	queryExecutor          dbinterfaces.QueryExecutorInterface
 	tableStatsCollector    dbinterfaces.TableStatsCollectorInterface
 	databaseStatsCollector dbinterfaces.DatabaseStatsCollectorInterface
-	queryOptimizer         *optimization.PostgreSQLQueryOptimizer
 }
 
 // Ensure PostgreSQLDatabase implements DatabaseInterface
@@ -43,7 +41,6 @@ func NewPostgreSQLDatabase(connectionURL string) (*PostgreSQLDatabase, error) {
 		queryExecutor:          queries.NewPostgreSQLExecutor(db),
 		tableStatsCollector:    stats.NewPostgreSQLTableStatsCollector(db),
 		databaseStatsCollector: stats.NewPostgreSQLDatabaseStatsCollector(db),
-		queryOptimizer:         optimization.NewPostgreSQLQueryOptimizer(db),
 	}, nil
 }
 
@@ -287,31 +284,4 @@ func (pg *PostgreSQLDatabase) GetDatabaseSize() (*models.DatabaseSize, error) {
 // GetActiveConnections returns active connection information
 func (pg *PostgreSQLDatabase) GetActiveConnections() ([]models.ActiveConnection, error) {
 	return pg.databaseStatsCollector.GetActiveConnections()
-}
-
-// Query Optimization Methods
-
-// AnalyzeQueryPerformance analyzes the performance of a given query
-func (pg *PostgreSQLDatabase) AnalyzeQueryPerformance(query string) (*models.PerformanceAnalysis, error) {
-	return pg.queryOptimizer.AnalyzeQueryPerformance(query)
-}
-
-// SuggestIndexes suggests indexes for a specific table
-func (pg *PostgreSQLDatabase) SuggestIndexes(tableName string) ([]models.IndexSuggestion, error) {
-	return pg.queryOptimizer.SuggestIndexes(tableName)
-}
-
-// GetQueryPatterns analyzes query patterns from pg_stat_statements
-func (pg *PostgreSQLDatabase) GetQueryPatterns() ([]models.QueryPattern, error) {
-	return pg.queryOptimizer.GetQueryPatterns()
-}
-
-// OptimizeQuery provides optimization suggestions for a specific query
-func (pg *PostgreSQLDatabase) OptimizeQuery(query string) ([]models.QueryOptimizationSuggestion, error) {
-	return pg.queryOptimizer.OptimizeQuery(query)
-}
-
-// AnalyzeTablePerformance analyzes performance issues specific to a table
-func (pg *PostgreSQLDatabase) AnalyzeTablePerformance(tableName string) (*models.PerformanceAnalysis, error) {
-	return pg.queryOptimizer.AnalyzeTablePerformance(tableName)
 }

@@ -89,31 +89,6 @@ func (m *MockDatabaseInterface) GetActiveConnections() ([]models.ActiveConnectio
 	return args.Get(0).([]models.ActiveConnection), args.Error(1)
 }
 
-func (m *MockDatabaseInterface) AnalyzeQueryPerformance(query string) (*models.PerformanceAnalysis, error) {
-	args := m.Called(query)
-	return args.Get(0).(*models.PerformanceAnalysis), args.Error(1)
-}
-
-func (m *MockDatabaseInterface) SuggestIndexes(tableName string) ([]models.IndexSuggestion, error) {
-	args := m.Called(tableName)
-	return args.Get(0).([]models.IndexSuggestion), args.Error(1)
-}
-
-func (m *MockDatabaseInterface) GetQueryPatterns() ([]models.QueryPattern, error) {
-	args := m.Called()
-	return args.Get(0).([]models.QueryPattern), args.Error(1)
-}
-
-func (m *MockDatabaseInterface) OptimizeQuery(query string) ([]models.QueryOptimizationSuggestion, error) {
-	args := m.Called(query)
-	return args.Get(0).([]models.QueryOptimizationSuggestion), args.Error(1)
-}
-
-func (m *MockDatabaseInterface) AnalyzeTablePerformance(tableName string) (*models.PerformanceAnalysis, error) {
-	args := m.Called(tableName)
-	return args.Get(0).(*models.PerformanceAnalysis), args.Error(1)
-}
-
 func TestNewExecutor(t *testing.T) {
 	mockDB := &MockDatabaseInterface{}
 	executor := NewExecutor(mockDB)
@@ -485,76 +460,6 @@ func TestExecutor_GetTableSizes(t *testing.T) {
 	err = json.Unmarshal([]byte(result), &sizes)
 	require.NoError(t, err)
 	assert.Equal(t, expectedSizes, sizes)
-
-	mockDB.AssertExpectations(t)
-}
-
-func TestExecutor_AnalyzeQueryPerformance(t *testing.T) {
-	mockDB := &MockDatabaseInterface{}
-	executor := NewExecutor(mockDB)
-
-	expectedAnalysis := &models.PerformanceAnalysis{
-		AnalysisDate:    "2023-01-01T10:00:00Z",
-		DatabaseSize:    "1.5 GB",
-		TableCount:      10,
-		IndexCount:      25,
-		OverallScore:    75,
-		Bottlenecks:     []string{"Missing index on email column"},
-		Recommendations: []models.QueryOptimizationSuggestion{},
-	}
-
-	mockDB.On("AnalyzeQueryPerformance", "SELECT * FROM users WHERE email = 'test@example.com'").Return(expectedAnalysis, nil)
-
-	toolCall := openai.ToolCall{
-		Function: openai.FunctionCall{
-			Name:      "analyze_query_performance",
-			Arguments: `{"query": "SELECT * FROM users WHERE email = 'test@example.com'"}`,
-		},
-	}
-
-	result, err := executor.Execute(toolCall)
-	require.NoError(t, err)
-
-	var analysis models.PerformanceAnalysis
-	err = json.Unmarshal([]byte(result), &analysis)
-	require.NoError(t, err)
-	assert.Equal(t, expectedAnalysis.AnalysisDate, analysis.AnalysisDate)
-	assert.Equal(t, expectedAnalysis.OverallScore, analysis.OverallScore)
-
-	mockDB.AssertExpectations(t)
-}
-
-func TestExecutor_SuggestIndexes(t *testing.T) {
-	mockDB := &MockDatabaseInterface{}
-	executor := NewExecutor(mockDB)
-
-	expectedSuggestions := []models.IndexSuggestion{
-		{
-			TableName: "users",
-			IndexName: "idx_users_email",
-			Columns:   []string{"email"},
-			IndexType: "btree",
-			Reason:    "Frequent queries on email column",
-			CreateSQL: "CREATE INDEX idx_users_email ON users(email)",
-		},
-	}
-
-	mockDB.On("SuggestIndexes", "users").Return(expectedSuggestions, nil)
-
-	toolCall := openai.ToolCall{
-		Function: openai.FunctionCall{
-			Name:      "suggest_indexes",
-			Arguments: `{"tableName": "users"}`,
-		},
-	}
-
-	result, err := executor.Execute(toolCall)
-	require.NoError(t, err)
-
-	var suggestions []models.IndexSuggestion
-	err = json.Unmarshal([]byte(result), &suggestions)
-	require.NoError(t, err)
-	assert.Equal(t, expectedSuggestions, suggestions)
 
 	mockDB.AssertExpectations(t)
 }

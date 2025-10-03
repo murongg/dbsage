@@ -29,13 +29,6 @@ type DatabaseInterface interface {
 	GetSlowQueries() ([]models.SlowQuery, error)
 	GetDatabaseSize() (*models.DatabaseSize, error)
 	GetActiveConnections() ([]models.ActiveConnection, error)
-
-	// Query Optimization
-	AnalyzeQueryPerformance(query string) (*models.PerformanceAnalysis, error)
-	SuggestIndexes(tableName string) ([]models.IndexSuggestion, error)
-	GetQueryPatterns() ([]models.QueryPattern, error)
-	OptimizeQuery(query string) ([]models.QueryOptimizationSuggestion, error)
-	AnalyzeTablePerformance(tableName string) (*models.PerformanceAnalysis, error)
 }
 
 // QueryExecutorInterface defines the interface for query execution

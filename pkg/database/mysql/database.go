@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"dbsage/internal/models"
-	"dbsage/pkg/database/mysql/optimization"
 	"dbsage/pkg/database/mysql/queries"
 	"dbsage/pkg/database/mysql/stats"
 	"dbsage/pkg/dbinterfaces"
@@ -20,7 +19,6 @@ type MySQLDatabase struct {
 	queryExecutor          dbinterfaces.QueryExecutorInterface
 	tableStatsCollector    dbinterfaces.TableStatsCollectorInterface
 	databaseStatsCollector dbinterfaces.DatabaseStatsCollectorInterface
-	queryOptimizer         *optimization.MySQLQueryOptimizer
 }
 
 // Ensure MySQLDatabase implements DatabaseInterface
@@ -43,7 +41,6 @@ func NewMySQLDatabase(connectionURL string) (*MySQLDatabase, error) {
 		queryExecutor:          queries.NewMySQLExecutor(db),
 		tableStatsCollector:    stats.NewMySQLTableStatsCollector(db),
 		databaseStatsCollector: stats.NewMySQLDatabaseStatsCollector(db),
-		queryOptimizer:         optimization.NewMySQLQueryOptimizer(db),
 	}, nil
 }
 
@@ -262,31 +259,4 @@ func (m *MySQLDatabase) GetDatabaseSize() (*models.DatabaseSize, error) {
 // GetActiveConnections returns active connection information
 func (m *MySQLDatabase) GetActiveConnections() ([]models.ActiveConnection, error) {
 	return m.databaseStatsCollector.GetActiveConnections()
-}
-
-// Query Optimization Methods
-
-// AnalyzeQueryPerformance analyzes the performance of a given query
-func (m *MySQLDatabase) AnalyzeQueryPerformance(query string) (*models.PerformanceAnalysis, error) {
-	return m.queryOptimizer.AnalyzeQueryPerformance(query)
-}
-
-// SuggestIndexes suggests indexes for a specific table
-func (m *MySQLDatabase) SuggestIndexes(tableName string) ([]models.IndexSuggestion, error) {
-	return m.queryOptimizer.SuggestIndexes(tableName)
-}
-
-// GetQueryPatterns analyzes query patterns from performance_schema
-func (m *MySQLDatabase) GetQueryPatterns() ([]models.QueryPattern, error) {
-	return m.queryOptimizer.GetQueryPatterns()
-}
-
-// OptimizeQuery provides optimization suggestions for a specific query
-func (m *MySQLDatabase) OptimizeQuery(query string) ([]models.QueryOptimizationSuggestion, error) {
-	return m.queryOptimizer.OptimizeQuery(query)
-}
-
-// AnalyzeTablePerformance analyzes performance issues specific to a table
-func (m *MySQLDatabase) AnalyzeTablePerformance(tableName string) (*models.PerformanceAnalysis, error) {
-	return m.queryOptimizer.AnalyzeTablePerformance(tableName)
 }

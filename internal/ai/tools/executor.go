@@ -66,16 +66,6 @@ func (e *Executor) Execute(toolCall openai.ToolCall) (string, error) {
 		return e.getTableSizes(dbTools)
 	case "get_active_connections":
 		return e.getActiveConnections(dbTools)
-	case "analyze_query_performance":
-		return e.analyzeQueryPerformance(dbTools, args)
-	case "suggest_indexes":
-		return e.suggestIndexes(dbTools, args)
-	case "get_query_patterns":
-		return e.getQueryPatterns(dbTools)
-	case "optimize_query":
-		return e.optimizeQuery(dbTools, args)
-	case "analyze_table_performance":
-		return e.analyzeTablePerformance(dbTools, args)
 	default:
 		return "", fmt.Errorf("unknown tool: %s", toolCall.Function.Name)
 	}
@@ -243,82 +233,6 @@ func (e *Executor) getActiveConnections(dbTools dbinterfaces.DatabaseInterface) 
 	resultJSON, err := json.Marshal(connections)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal connections: %w", err)
-	}
-	return string(resultJSON), nil
-}
-
-func (e *Executor) analyzeQueryPerformance(dbTools dbinterfaces.DatabaseInterface, args map[string]interface{}) (string, error) {
-	query, ok := args["query"].(string)
-	if !ok {
-		return "", fmt.Errorf("query argument is required and must be a string")
-	}
-	analysis, err := dbTools.AnalyzeQueryPerformance(query)
-	if err != nil {
-		return "", err
-	}
-	resultJSON, err := json.Marshal(analysis)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal analysis: %w", err)
-	}
-	return string(resultJSON), nil
-}
-
-func (e *Executor) suggestIndexes(dbTools dbinterfaces.DatabaseInterface, args map[string]interface{}) (string, error) {
-	tableName, ok := args["tableName"].(string)
-	if !ok {
-		return "", fmt.Errorf("tableName argument is required and must be a string")
-	}
-	suggestions, err := dbTools.SuggestIndexes(tableName)
-	if err != nil {
-		return "", err
-	}
-	resultJSON, err := json.Marshal(suggestions)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal suggestions: %w", err)
-	}
-	return string(resultJSON), nil
-}
-
-func (e *Executor) getQueryPatterns(dbTools dbinterfaces.DatabaseInterface) (string, error) {
-	patterns, err := dbTools.GetQueryPatterns()
-	if err != nil {
-		return "", err
-	}
-	resultJSON, err := json.Marshal(patterns)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal patterns: %w", err)
-	}
-	return string(resultJSON), nil
-}
-
-func (e *Executor) optimizeQuery(dbTools dbinterfaces.DatabaseInterface, args map[string]interface{}) (string, error) {
-	query, ok := args["query"].(string)
-	if !ok {
-		return "", fmt.Errorf("query argument is required and must be a string")
-	}
-	suggestions, err := dbTools.OptimizeQuery(query)
-	if err != nil {
-		return "", err
-	}
-	resultJSON, err := json.Marshal(suggestions)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal optimization suggestions: %w", err)
-	}
-	return string(resultJSON), nil
-}
-
-func (e *Executor) analyzeTablePerformance(dbTools dbinterfaces.DatabaseInterface, args map[string]interface{}) (string, error) {
-	tableName, ok := args["tableName"].(string)
-	if !ok {
-		return "", fmt.Errorf("tableName argument is required and must be a string")
-	}
-	analysis, err := dbTools.AnalyzeTablePerformance(tableName)
-	if err != nil {
-		return "", err
-	}
-	resultJSON, err := json.Marshal(analysis)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal table analysis: %w", err)
 	}
 	return string(resultJSON), nil
 }

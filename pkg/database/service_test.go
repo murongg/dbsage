@@ -87,31 +87,6 @@ func (m *MockDatabaseInterface) GetActiveConnections() ([]models.ActiveConnectio
 	return args.Get(0).([]models.ActiveConnection), args.Error(1)
 }
 
-func (m *MockDatabaseInterface) AnalyzeQueryPerformance(query string) (*models.PerformanceAnalysis, error) {
-	args := m.Called(query)
-	return args.Get(0).(*models.PerformanceAnalysis), args.Error(1)
-}
-
-func (m *MockDatabaseInterface) SuggestIndexes(tableName string) ([]models.IndexSuggestion, error) {
-	args := m.Called(tableName)
-	return args.Get(0).([]models.IndexSuggestion), args.Error(1)
-}
-
-func (m *MockDatabaseInterface) GetQueryPatterns() ([]models.QueryPattern, error) {
-	args := m.Called()
-	return args.Get(0).([]models.QueryPattern), args.Error(1)
-}
-
-func (m *MockDatabaseInterface) OptimizeQuery(query string) ([]models.QueryOptimizationSuggestion, error) {
-	args := m.Called(query)
-	return args.Get(0).([]models.QueryOptimizationSuggestion), args.Error(1)
-}
-
-func (m *MockDatabaseInterface) AnalyzeTablePerformance(tableName string) (*models.PerformanceAnalysis, error) {
-	args := m.Called(tableName)
-	return args.Get(0).(*models.PerformanceAnalysis), args.Error(1)
-}
-
 // MockConnectionManager is a mock implementation of ConnectionManagerInterface
 type MockConnectionManager struct {
 	mock.Mock

@@ -3,7 +3,6 @@ package models
 import (
 	"encoding/json"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -181,99 +180,6 @@ func TestActiveConnectionValidation(t *testing.T) {
 	assert.NotEmpty(t, connection.Username)
 	assert.NotEmpty(t, connection.Database)
 	assert.NotEmpty(t, connection.State)
-}
-
-func TestQueryOptimizationSuggestionValidation(t *testing.T) {
-	suggestion := QueryOptimizationSuggestion{
-		Type:        "index",
-		Priority:    "high",
-		Description: "Add index on email column",
-		Details:     "Creating a B-tree index on email column will improve query performance",
-		Impact:      "Expected 80% performance improvement",
-		SQLBefore:   "SELECT * FROM users WHERE email = 'test@example.com'",
-		SQLAfter:    "CREATE INDEX idx_users_email ON users(email)",
-		Cost:        0.8,
-	}
-
-	assert.Contains(t, []string{"index", "rewrite", "structure"}, suggestion.Type)
-	assert.Contains(t, []string{"high", "medium", "low"}, suggestion.Priority)
-	assert.NotEmpty(t, suggestion.Description)
-	assert.NotEmpty(t, suggestion.Impact)
-	assert.Positive(t, suggestion.Cost)
-}
-
-func TestIndexSuggestionValidation(t *testing.T) {
-	suggestion := IndexSuggestion{
-		TableName:     "users",
-		IndexName:     "idx_users_email",
-		Columns:       []string{"email"},
-		IndexType:     "btree",
-		Reason:        "Frequent queries on email column",
-		Impact:        "High performance improvement",
-		CreateSQL:     "CREATE INDEX idx_users_email ON users(email)",
-		EstimatedSize: "2 MB",
-	}
-
-	assert.NotEmpty(t, suggestion.TableName)
-	assert.NotEmpty(t, suggestion.IndexName)
-	assert.NotEmpty(t, suggestion.Columns)
-	assert.NotEmpty(t, suggestion.IndexType)
-	assert.NotEmpty(t, suggestion.CreateSQL)
-}
-
-func TestQueryPatternValidation(t *testing.T) {
-	suggestions := []QueryOptimizationSuggestion{
-		{
-			Type:     "index",
-			Priority: "high",
-			Cost:     0.8,
-		},
-	}
-
-	pattern := QueryPattern{
-		PatternType: "frequent",
-		Query:       "SELECT * FROM users WHERE status = ?",
-		Count:       1000,
-		AvgTime:     25.5,
-		TotalTime:   25500.0,
-		Tables:      []string{"users"},
-		Suggestions: suggestions,
-	}
-
-	assert.Contains(t, []string{"frequent", "slow", "complex"}, pattern.PatternType)
-	assert.NotEmpty(t, pattern.Query)
-	assert.Positive(t, pattern.Count)
-	assert.Positive(t, pattern.AvgTime)
-	assert.Positive(t, pattern.TotalTime)
-	assert.NotEmpty(t, pattern.Tables)
-	assert.NotEmpty(t, pattern.Suggestions)
-}
-
-func TestPerformanceAnalysisValidation(t *testing.T) {
-	now := time.Now()
-	analysis := PerformanceAnalysis{
-		AnalysisDate:     now.Format(time.RFC3339),
-		DatabaseSize:     "1.5 GB",
-		TableCount:       50,
-		IndexCount:       150,
-		SlowQueryCount:   10,
-		Bottlenecks:      []string{"Missing index on users.email", "Slow query pattern"},
-		IndexSuggestions: []IndexSuggestion{},
-		QueryPatterns:    []QueryPattern{},
-		OverallScore:     75,
-		Recommendations:  []QueryOptimizationSuggestion{},
-	}
-
-	assert.NotEmpty(t, analysis.AnalysisDate)
-	assert.NotEmpty(t, analysis.DatabaseSize)
-	assert.Positive(t, analysis.TableCount)
-	assert.Positive(t, analysis.IndexCount)
-	assert.GreaterOrEqual(t, analysis.OverallScore, 0)
-	assert.LessOrEqual(t, analysis.OverallScore, 100)
-
-	// Validate date format
-	_, err := time.Parse(time.RFC3339, analysis.AnalysisDate)
-	assert.NoError(t, err, "AnalysisDate should be in RFC3339 format")
 }
 
 func TestQueryResultRowValidation(t *testing.T) {

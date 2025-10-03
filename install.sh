@@ -221,8 +221,17 @@ download_binary() {
     
     cd "$temp_dir"
     
-    # Determine archive name based on platform
-    local archive_name="dbsage_${platform}.tar.gz"
+    # Determine archive name and format based on platform
+    local archive_name
+    local extract_cmd
+    if [[ "$platform" == *"windows"* ]]; then
+        archive_name="dbsage_${platform}.zip"
+        extract_cmd="unzip -q"
+    else
+        archive_name="dbsage_${platform}.tar.gz"
+        extract_cmd="tar -xzf"
+    fi
+    
     local download_url="https://github.com/murongg/dbsage/releases/download/${version}/${archive_name}"
     local cache_dir="$HOME/.cache/dbsage"
     local cached_file="$cache_dir/${version}_${archive_name}"
@@ -262,15 +271,21 @@ download_binary() {
     
     # Extract the archive
     print_info "Extracting binary..."
-    tar -xzf "$archive_name"
+    $extract_cmd "$archive_name"
     
     if [ $? -ne 0 ]; then
         print_error "Failed to extract archive"
         exit 1
     fi
     
+    # Handle Windows executable extension
+    local binary_file="$BINARY_NAME"
+    if [[ "$platform" == *"windows"* ]]; then
+        binary_file="${BINARY_NAME}.exe"
+    fi
+    
     # Make binary executable
-    chmod +x "$BINARY_NAME"
+    chmod +x "$binary_file"
     
     print_success "Binary download and extraction completed"
 }
@@ -278,25 +293,42 @@ download_binary() {
 # Install binary
 install_binary() {
     local temp_dir=$1
-    local source_binary="$temp_dir/$BINARY_NAME"
+    local platform=$2
+    
+    # Determine source binary name (handle Windows .exe extension)
+    local source_binary_name="$BINARY_NAME"
+    if [[ "$platform" == *"windows"* ]]; then
+        source_binary_name="${BINARY_NAME}.exe"
+    fi
+    local source_binary="$temp_dir/$source_binary_name"
+    
+    # Determine target binary name
+    local target_binary_name="$BINARY_NAME"
+    if [[ "$platform" == *"windows"* ]]; then
+        target_binary_name="${BINARY_NAME}.exe"
+    fi
     
     if [ "$INSTALL_GLOBAL" = true ]; then
         print_info "Installing DBSage to $INSTALL_DIR..."
         
         if [ ! -w "$INSTALL_DIR" ]; then
-            sudo cp "$source_binary" "$INSTALL_DIR/"
-            sudo chmod +x "$INSTALL_DIR/$BINARY_NAME"
+            sudo cp "$source_binary" "$INSTALL_DIR/$target_binary_name"
+            sudo chmod +x "$INSTALL_DIR/$target_binary_name"
         else
-            cp "$source_binary" "$INSTALL_DIR/"
-            chmod +x "$INSTALL_DIR/$BINARY_NAME"
+            cp "$source_binary" "$INSTALL_DIR/$target_binary_name"
+            chmod +x "$INSTALL_DIR/$target_binary_name"
         fi
         
-        print_success "DBSage installed to $INSTALL_DIR/$BINARY_NAME"
+        print_success "DBSage installed to $INSTALL_DIR/$target_binary_name"
     else
         print_info "Installing DBSage to current directory..."
-        cp "$source_binary" "./$BINARY_NAME"
-        chmod +x "./$BINARY_NAME"
-        print_success "DBSage installed to $(pwd)/$BINARY_NAME"
+        if [ "$source_binary" != "$(pwd)/$target_binary_name" ]; then
+            cp "$source_binary" "./$target_binary_name"
+            chmod +x "./$target_binary_name"
+        else
+            print_info "Binary already exists at target location"
+        fi
+        print_success "DBSage installed to $(pwd)/$target_binary_name"
     fi
 }
 
@@ -522,7 +554,7 @@ main() {
     download_binary "$temp_dir" "$target_version" "$platform"
     
     # Install
-    install_binary "$temp_dir"
+    install_binary "$temp_dir" "$platform"
     
     # Create configuration
     create_config

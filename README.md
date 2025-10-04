@@ -53,8 +53,14 @@ make run
 
 1. **Configure API Key**
    ```bash
-   nano ~/.dbsage/config.env
-   # Set: OPENAI_API_KEY=your_api_key_here
+   # Set environment variable (choose one method):
+   
+   # Method 1: Temporary (current session only)
+   export OPENAI_API_KEY=your_api_key_here
+   
+   # Method 2: Permanent (add to shell config)
+   echo 'export OPENAI_API_KEY=your_api_key_here' >> ~/.zshrc  # or ~/.bashrc
+   source ~/.zshrc  # or ~/.bashrc
    ```
 
 2. **Launch DBSage**
@@ -102,13 +108,30 @@ dbsage --help         # Show usage help
 
 ## Configuration
 
-```bash
-# ~/.dbsage/config.env
-OPENAI_API_KEY=your_openai_api_key_here
-OPENAI_BASE_URL=https://api.openai.com/v1
+### Environment Variables
 
-# Optional database connection
-DATABASE_URL=postgres://user:pass@localhost:5432/db
+Set these in your shell environment:
+
+```bash
+# Required
+export OPENAI_API_KEY=your_openai_api_key_here
+
+# Optional
+export OPENAI_BASE_URL=https://api.openai.com/v1  # Default OpenAI endpoint
+```
+
+### Persistent Configuration
+
+Add to your shell configuration file (`~/.zshrc`, `~/.bashrc`, or `~/.profile`):
+
+```bash
+export OPENAI_API_KEY=your_openai_api_key_here
+export OPENAI_BASE_URL=https://api.openai.com/v1  # Optional
+```
+
+Then reload your shell configuration:
+```bash
+source ~/.zshrc  # or ~/.bashrc, ~/.profile
 ```
 
 ## Examples

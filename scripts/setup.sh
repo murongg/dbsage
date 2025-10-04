@@ -21,31 +21,16 @@ fi
 
 echo "✅ Go version $GO_VERSION detected"
 
-# Create .env file from example
-if [ ! -f ".env" ]; then
-    if [ -f "configs/config.example" ]; then
-        echo "📄 Creating .env file from configs/config.example..."
-        cp configs/config.example .env
-        echo "✅ .env file created!"
-    else
-        echo "📄 Creating .env file with default template..."
-        cat > .env << 'EOF'
-# OpenAI Configuration (Required for AI features)
-# Get your API key from: https://platform.openai.com/api-keys
-OPENAI_API_KEY=your_openai_api_key_here
-OPENAI_BASE_URL=https://api.openai.com/v1
-
-# Database Configuration (Optional - can be set up through the app)
-# Note: You can add database connections using '/add <name>' command in the app
-# DATABASE_URL=postgres://username:password@localhost:5432/database?sslmode=disable
-
-# Optional: Application Configuration
-# LOG_LEVEL=info
-EOF
-        echo "✅ .env file created with default template!"
-    fi
+# Check if .env file exists (for backwards compatibility)
+if [ -f ".env" ]; then
+    echo "📄 Found existing .env file - loading environment variables..."
+    set -a
+    source .env
+    set +a
+    echo "✅ Environment variables loaded from .env"
 else
-    echo "⚠️  .env file already exists, skipping creation"
+    echo "ℹ️  No .env file found - will use system environment variables"
+    echo "   Set OPENAI_API_KEY environment variable to enable AI features"
 fi
 
 # Install dependencies
@@ -71,9 +56,13 @@ echo ""
 echo "🚀 Quick Start Guide:"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
-echo "1. 🔑 Get your OpenAI API key:"
+echo "1. 🔑 Configure OpenAI API Key:"
 echo "   → Visit: https://platform.openai.com/api-keys"
-echo "   → Edit .env file and set: OPENAI_API_KEY=your_actual_key"
+echo "   → Set environment variable:"
+echo "     export OPENAI_API_KEY=your_actual_key"
+echo "   → For persistent configuration, add to ~/.zshrc or ~/.bashrc:"
+echo "     echo 'export OPENAI_API_KEY=your_key' >> ~/.zshrc"
+echo "     source ~/.zshrc"
 echo ""
 echo "2. 🏃 Run DBSage:"
 echo "   → ./scripts/run.sh    # or make run"

@@ -33,7 +33,7 @@ fi
 if [ $config_warnings -gt 0 ]; then
     echo ""
     echo "📋 Quick setup guide:"
-    echo "   1. Create .env file with: OPENAI_API_KEY=your_api_key_here"
+    echo "   1. Set environment variable: export OPENAI_API_KEY=your_api_key_here"
     echo "   2. Start DBSage and use '/add mydb' to add database connections"
     echo "   3. Follow the in-app guidance for complete setup"
     echo ""

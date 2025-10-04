@@ -355,38 +355,17 @@ create_config() {
         return
     fi
     
-    print_info "Creating configuration directory and files..."
+    print_info "Creating configuration directory..."
     
     # Create configuration directory
     mkdir -p "$CONFIG_DIR"
-    
-    # Create example configuration file
-    cat > "$CONFIG_DIR/config.env" << 'EOF'
-# DBSage Configuration File
-# Please modify the following configuration as needed
-
-# OpenAI API Configuration
-OPENAI_API_KEY=your_openai_api_key_here
-OPENAI_BASE_URL=https://api.openai.com/v1
-
-# Database Configuration (optional, can also be added at runtime)
-# DATABASE_URL=postgres://username:password@localhost:5432/database?sslmode=disable
-
-# Log Level (optional)
-# LOG_LEVEL=info
-
-# Other Configuration
-# MAX_CONNECTIONS=10
-# TIMEOUT=30s
-EOF
     
     # Create connection configuration file
     cat > "$CONFIG_DIR/connections.json" << 'EOF'
 {}
 EOF
     
-    print_success "Configuration files created in $CONFIG_DIR/"
-    print_info "Please edit $CONFIG_DIR/config.env file to set your OpenAI API Key"
+    print_success "Configuration directory created at $CONFIG_DIR/"
 }
 
 # Setup environment variables
@@ -455,8 +434,12 @@ show_post_install_instructions() {
     echo -e "${YELLOW}${ROCKET} Quick Start:${NC}"
     echo ""
     echo "1. ${BLUE}Configure OpenAI API Key:${NC}"
-    echo "   Edit configuration file: ${GREEN}$CONFIG_DIR/config.env${NC}"
-    echo "   Set: ${CYAN}OPENAI_API_KEY=your_actual_api_key${NC}"
+    echo "   Set environment variable in your shell:"
+    echo "   ${CYAN}export OPENAI_API_KEY=your_actual_api_key${NC}"
+    echo ""
+    echo "   For persistent configuration, add to your shell config:"
+    echo "   ${GREEN}echo 'export OPENAI_API_KEY=your_key' >> ~/.zshrc${NC}  # or ~/.bashrc"
+    echo "   ${GREEN}source ~/.zshrc${NC}  # or ~/.bashrc"
     echo ""
     echo "2. ${BLUE}Start DBSage:${NC}"
     if [ "$INSTALL_GLOBAL" = true ]; then

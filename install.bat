@@ -346,31 +346,10 @@ if not exist "%CONFIG_DIR%" (
     )
 )
 
-REM Create example configuration file
-(
-echo # DBSage Configuration File
-echo # Please modify the following configuration as needed
-echo.
-echo # OpenAI API Configuration
-echo OPENAI_API_KEY=your_openai_api_key_here
-echo OPENAI_BASE_URL=https://api.openai.com/v1
-echo.
-echo # Database Configuration (optional, can also be added at runtime)
-echo # DATABASE_URL=postgres://username:password@localhost:5432/database?sslmode=disable
-echo.
-echo # Log Level (optional)
-echo # LOG_LEVEL=info
-echo.
-echo # Other Configuration
-echo # MAX_CONNECTIONS=10
-echo # TIMEOUT=30s
-) > "%CONFIG_DIR%\config.env"
-
 REM Create connection configuration file
 echo {}> "%CONFIG_DIR%\connections.json"
 
-echo %GREEN%%SUCCESS% Configuration files created in %CONFIG_DIR%\%NC%
-echo %INFO% Please edit %CONFIG_DIR%\config.env file to set your OpenAI API Key%NC%
+echo %GREEN%%SUCCESS% Configuration directory created at %CONFIG_DIR%\%NC%
 exit /b 0
 
 :setup_environment
@@ -426,8 +405,13 @@ echo ===============================================================
 echo %YELLOW%%ROCKET% Quick Start:%NC%
 echo.
 echo 1. %BLUE%Configure OpenAI API Key:%NC%
-echo    Edit configuration file: %GREEN%%CONFIG_DIR%\config.env%NC%
-echo    Set: %CYAN%OPENAI_API_KEY=your_actual_api_key%NC%
+echo    Set environment variable in Windows:
+echo    %CYAN%setx OPENAI_API_KEY "your_actual_api_key"%NC%
+echo.
+echo    Or for current session only:
+echo    %CYAN%set OPENAI_API_KEY=your_actual_api_key%NC%
+echo.
+echo    Note: You may need to reopen command prompt after using setx
 echo.
 echo 2. %BLUE%Start DBSage:%NC%
 if "%INSTALL_GLOBAL%"=="true" (
